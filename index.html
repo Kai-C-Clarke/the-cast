@@ -614,6 +614,16 @@
       min-height: 1.4em;
     }
     .compose-status.error { color: #ffb3b3; font-style: normal; }
+    .compose-attribution {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.25em;
+      font-size: 0.62rem;
+      color: #6fa8d4;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    audio { filter: invert(1) hue-rotate(180deg); opacity: 0.85; }
 
     /* Compose button on card */
     .card-compose {
@@ -721,7 +731,7 @@
         <div class="email-msg reveal">
           <div class="email-header">
             <span class="email-from">Guy</span>
-            <span class="email-to-label">to henry@askian.net</span>
+            <span class="email-to-label">to <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="afc7cac1ddd6efcedcc4c6cec181c1cadb">[email&#160;protected]</a></span>
           </div>
           <div class="email-bubble">Is alcohol dangerous?</div>
         </div>
@@ -840,7 +850,7 @@
     </div>
   </div>
 
-  <script>
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
     // ── Scroll reveal ──
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(e => {
@@ -1456,9 +1466,11 @@
       </div>
       <div class="compose-result-area" id="composeResultArea">
         <div class="compose-result-label">The Composition</div>
+        <audio id="composeAudio" controls style="width:100%;margin-bottom:18px;"></audio>
+        <div class="compose-attribution" id="composeAttribution"></div>
         <div class="compose-result-text" id="composeResultText"></div>
         <div class="compose-actions" style="margin-top:20px;">
-          <button class="compose-btn" id="composeSaveBtn">Save as text</button>
+          <button class="compose-btn" id="composeSaveBtn">Save as MP3</button>
           <button class="compose-btn primary" id="composeAgainBtn">Compose Again</button>
         </div>
       </div>
@@ -1477,8 +1489,10 @@
     const composeResultText= document.getElementById('composeResultText');
     const composeSaveBtn   = document.getElementById('composeSaveBtn');
     const composeAgainBtn  = document.getElementById('composeAgainBtn');
+    const composeAudio     = document.getElementById('composeAudio');
+    const composeAttrib    = document.getElementById('composeAttribution');
 
-    let lastComposition = '';
+    let lastMp3Blob = null;
 
     function openComposeModal() {
       composeInput.value = '';
@@ -1486,6 +1500,9 @@
       composeStatus.className = 'compose-status';
       composeResultArea.classList.remove('visible');
       composeResultText.textContent = '';
+      composeAudio.src = '';
+      composeAttrib.textContent = '';
+      lastMp3Blob = null;
       composeBackdrop.classList.add('visible');
       setTimeout(() => composeInput.focus(), 50);
     }
@@ -1500,6 +1517,9 @@
       composeStatus.className = 'compose-status';
       composeResultArea.classList.remove('visible');
       composeResultText.textContent = '';
+      composeAudio.src = '';
+      composeAttrib.textContent = '';
+      lastMp3Blob = null;
       setTimeout(() => composeInput.focus(), 50);
     }
 
@@ -1509,11 +1529,10 @@
     composeAgainBtn.addEventListener('click', resetComposeToInput);
 
     composeSaveBtn.addEventListener('click', () => {
-      if (!lastComposition) return;
-      const blob = new Blob([lastComposition], { type: 'text/plain' });
+      if (!lastMp3Blob) return;
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'tomita-composition.txt';
+      a.href = URL.createObjectURL(lastMp3Blob);
+      a.download = 'tomita-composition.mp3';
       a.click();
     });
 
@@ -1525,31 +1544,61 @@
         return;
       }
       composeSubmitBtn.disabled = true;
-      composeStatus.textContent = 'Tomita listens…';
+      composeStatus.textContent = 'Tomita listens… the synthesizers warm slowly.';
       composeStatus.className = 'compose-status';
       composeResultArea.classList.remove('visible');
 
       try {
-        const res = await fetch('/.netlify/functions/tomita', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
-        });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        lastComposition = data.composition;
-        composeResultText.textContent = data.composition;
+        // Run audio generation and programme note in parallel
+        const [audioRes, noteRes] = await Promise.all([
+          fetch('https://claude-composer.onrender.com/compose_tomita', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+          }),
+          fetch('/.netlify/functions/tomita', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+          })
+        ]);
+
+        composeStatus.textContent = 'Assembling the form…';
+
+        const audioData = await audioRes.json();
+        if (audioData.error) throw new Error(audioData.error);
+
+        // Decode base64 MP3 → Blob → Object URL
+        const mp3Bytes = Uint8Array.from(atob(audioData.mp3), c => c.charCodeAt(0));
+        lastMp3Blob = new Blob([mp3Bytes], { type: 'audio/mpeg' });
+        composeAudio.src = URL.createObjectURL(lastMp3Blob);
+
+        // Attribution line
+        const mood = audioData.lyria_prompt
+          ? audioData.lyria_prompt.split(',').slice(-3).join('·').trim()
+          : '';
+        composeAttrib.textContent = `Isao Tomita  ·  Electronic Soundscape  ·  ABA Form`;
+
+        // Programme note from tomita.js (non-fatal if it fails)
+        try {
+          const noteData = await noteRes.json();
+          composeResultText.textContent = noteData.composition || '';
+        } catch (_) {
+          composeResultText.textContent = '';
+        }
+
         composeResultArea.classList.add('visible');
         composeStatus.textContent = '';
         composeResultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
       } catch (err) {
-        composeStatus.textContent = 'Something went wrong. Please try again.';
+        composeStatus.textContent = 'Something went wrong. ' + err.message;
         composeStatus.className = 'compose-status error';
       } finally {
         composeSubmitBtn.disabled = false;
       }
     });
-  </script>
 
+  </script>
 </body>
 </html>
