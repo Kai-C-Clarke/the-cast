@@ -614,33 +614,6 @@
       min-height: 1.4em;
     }
     .compose-status.error { color: #ffb3b3; font-style: normal; }
-
-    .tape-spool-wrap {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      padding: 28px 0 8px;
-      gap: 14px;
-    }
-    .tape-spool-wrap.spinning { display: flex; }
-    .tape-spool {
-      width: 72px;
-      height: 72px;
-      animation: spool-turn 1.8s linear infinite;
-      transform-origin: center;
-    }
-    @keyframes spool-turn {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
-    }
-    .tape-spool-msg {
-      font-family: 'Oswald', sans-serif;
-      font-weight: 300;
-      letter-spacing: 0.3em;
-      font-size: 0.62rem;
-      color: #6fa8d4;
-      text-transform: uppercase;
-    }
     .compose-attribution {
       font-family: 'Oswald', sans-serif;
       font-weight: 300;
@@ -1490,26 +1463,6 @@
           <button class="compose-btn primary" id="composeSubmitBtn">Compose</button>
         </div>
         <div class="compose-status" id="composeStatus"></div>
-        <div class="tape-spool-wrap" id="tapeSpoolWrap">
-          <svg class="tape-spool" id="tapeSpool" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-            <!-- Outer reel rim -->
-            <circle cx="40" cy="40" r="36" fill="none" stroke="#6fa8d4" stroke-width="2" opacity="0.4"/>
-            <!-- Tape hub -->
-            <circle cx="40" cy="40" r="10" fill="none" stroke="#6fa8d4" stroke-width="2" opacity="0.7"/>
-            <!-- Spokes -->
-            <line x1="40" y1="30" x2="40" y2="10" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <line x1="40" y1="50" x2="40" y2="70" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <line x1="30" y1="40" x2="10" y2="40" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <line x1="50" y1="40" x2="70" y2="40" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <line x1="33" y1="33" x2="18" y2="18" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <line x1="47" y1="47" x2="62" y2="62" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <line x1="47" y1="33" x2="62" y2="18" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <line x1="33" y1="47" x2="18" y2="62" stroke="#6fa8d4" stroke-width="1.5" opacity="0.6"/>
-            <!-- Tape wound around rim (arc dashes) -->
-            <circle cx="40" cy="40" r="28" fill="none" stroke="#6fa8d4" stroke-width="6" stroke-dasharray="12 6" opacity="0.2"/>
-          </svg>
-          <div class="tape-spool-msg" id="tapeSpoolMsg">Tomita listens…</div>
-        </div>
       </div>
       <div class="compose-result-area" id="composeResultArea">
         <div class="compose-result-label">The Composition</div>
@@ -1538,22 +1491,8 @@
     const composeAgainBtn  = document.getElementById('composeAgainBtn');
     const composeAudio     = document.getElementById('composeAudio');
     const composeAttrib    = document.getElementById('composeAttribution');
-    const tapeSpoolWrap    = document.getElementById('tapeSpoolWrap');
-    const tapeSpoolMsg     = document.getElementById('tapeSpoolMsg');
 
     let lastMp3Blob = null;
-
-    function spoolStart(msg) {
-      tapeSpoolMsg.textContent = msg || 'Tomita listens…';
-      tapeSpoolWrap.classList.add('spinning');
-      composeStatus.textContent = '';
-    }
-    function spoolStop() {
-      tapeSpoolWrap.classList.remove('spinning');
-    }
-    function spoolMsg(msg) {
-      tapeSpoolMsg.textContent = msg;
-    }
 
     function openComposeModal() {
       composeInput.value = '';
@@ -1564,7 +1503,6 @@
       composeAudio.src = '';
       composeAttrib.textContent = '';
       lastMp3Blob = null;
-      spoolStop();
       composeBackdrop.classList.add('visible');
       setTimeout(() => composeInput.focus(), 50);
     }
@@ -1582,7 +1520,6 @@
       composeAudio.src = '';
       composeAttrib.textContent = '';
       lastMp3Blob = null;
-      spoolStop();
       setTimeout(() => composeInput.focus(), 50);
     }
 
@@ -1607,7 +1544,8 @@
         return;
       }
       composeSubmitBtn.disabled = true;
-      spoolStart('Tomita listens…');
+      composeStatus.textContent = 'Tomita listens… the synthesizers warm slowly.';
+      composeStatus.className = 'compose-status';
       composeResultArea.classList.remove('visible');
 
       try {
@@ -1625,7 +1563,7 @@
           })
         ]);
 
-        spoolMsg('Assembling the form…');
+        composeStatus.textContent = 'Assembling the form…';
 
         const audioData = await audioRes.json();
         if (audioData.error) throw new Error(audioData.error);
@@ -1639,29 +1577,21 @@
         const mood = audioData.lyria_prompt
           ? audioData.lyria_prompt.split(',').slice(-3).join('·').trim()
           : '';
-        composeAttrib.textContent = `Isao Tomita  ·  Electronic Soundscape  ·  ABA Form`;
+        composeAttrib.textContent = `Isao Tomita  ·  Electronic Soundscape  ·  ABBA Form`;
 
         // Programme note from tomita.js (non-fatal if it fails)
         try {
           const noteData = await noteRes.json();
-          const raw = noteData.composition || '';
-          composeResultText.innerHTML = raw
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g,'<em>$1</em>')
-            .replace(/\n\n/g,'</p><p>')
-            .replace(/^/,'<p>').replace(/$/,'</p>');
+          composeResultText.textContent = noteData.composition || '';
         } catch (_) {
           composeResultText.textContent = '';
         }
 
-        spoolStop();
         composeResultArea.classList.add('visible');
         composeStatus.textContent = '';
         composeResultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
       } catch (err) {
-        spoolStop();
         composeStatus.textContent = 'Something went wrong. ' + err.message;
         composeStatus.className = 'compose-status error';
       } finally {
