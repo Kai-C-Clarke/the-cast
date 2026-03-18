@@ -64,6 +64,9 @@ exports.handler = async function(event, context) {
       throw new Error('API error: ' + JSON.stringify(data));
     }
 
+    // Log the model actually used by DeepSeek — should always be deepseek-chat
+    console.log(`[chat.js] Model requested: deepseek-chat | Model used: ${data.model} | Tokens: ${data.usage?.total_tokens || 'unknown'}`);
+
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
