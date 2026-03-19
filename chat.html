@@ -982,6 +982,17 @@ document.title = `Chat with ${char.name} — The Cast`;
 // Conversation history
 const history = [];
 
+// Persistent user identity — generated once, stored forever in localStorage
+function getUserId() {
+  let uid = localStorage.getItem('thecast_user_id');
+  if (!uid) {
+    uid = 'u_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem('thecast_user_id', uid);
+  }
+  return uid;
+}
+const userId = getUserId();
+
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
@@ -1014,7 +1025,9 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: history,
-        system_prompt: char.system
+        system_prompt: char.system,
+        user_id: userId,
+        character: charKey
       })
     });
 
