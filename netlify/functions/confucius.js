@@ -1,6 +1,7 @@
 const https = require('https');
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const { sendLangfuseTrace } = require('./langfuse_helper');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -97,6 +98,20 @@ exports.handler = async function(event, context) {
     const raw = data.choices[0].message.content.trim();
     const clean = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
     const parsed = JSON.parse(clean);
+
+    // Send trace to Langfuse (fire and forget)
+    sendLangfuseTrace({
+      name: 'confucius',
+      input: { question },
+      output: parsed,
+      model: data.model,
+      usage: data.usage,
+      metadata: {
+        source: 'thecast.chat',
+        function: 'confucius',
+        characters: `${parsed.character_a} + ${parsed.character_b}`
+      }
+    });
 
     return {
       statusCode: 200,

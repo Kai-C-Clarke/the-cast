@@ -1,6 +1,7 @@
 const https = require('https');
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const { sendLangfuseTrace } = require('./langfuse_helper');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -75,6 +76,16 @@ exports.handler = async function(event, context) {
     if (!data.choices || !data.choices[0]) {
       throw new Error('API error: ' + JSON.stringify(data));
     }
+
+    // Send trace to Langfuse (fire and forget)
+    sendLangfuseTrace({
+      name: 'tomita-compose',
+      input: { prompt },
+      output: data.choices[0].message.content,
+      model: data.model,
+      usage: data.usage,
+      metadata: { source: 'thecast.chat', function: 'tomita' }
+    });
 
     return {
       statusCode: 200,

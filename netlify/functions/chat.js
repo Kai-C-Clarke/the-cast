@@ -1,6 +1,7 @@
 const https = require('https');
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const { sendLangfuseTrace } = require('./langfuse_helper');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -66,6 +67,16 @@ exports.handler = async function(event, context) {
 
     // Log the model actually used by DeepSeek — should always be deepseek-chat
     console.log(`[chat.js] Model requested: deepseek-chat | Model used: ${data.model} | Tokens: ${data.usage?.total_tokens || 'unknown'}`);
+
+    // Send trace to Langfuse (fire and forget)
+    sendLangfuseTrace({
+      name: 'wire-chat',
+      input: { system_prompt: system_prompt?.slice(0, 200), messages },
+      output: data.choices[0].message.content,
+      model: data.model,
+      usage: data.usage,
+      metadata: { source: 'thecast.chat', function: 'chat' }
+    });
 
     return {
       statusCode: 200,
