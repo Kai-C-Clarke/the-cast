@@ -668,6 +668,8 @@
       transition: all 0.3s ease;
     }
     .card-compose:hover { background: rgba(100,160,220,0.18); border-color: #6fa8d4; }
+    .card-tribute { display: inline-block; font-family: 'EB Garamond', serif; font-size: 0.8rem; letter-spacing: 0.08em; font-style: italic; color: rgba(201,168,76,0.65); text-decoration: none; padding: 6px 12px; border: 1px solid rgba(201,168,76,0.2); transition: all 0.2s ease; margin-top: 4px; }
+    .card-tribute:hover { color: rgba(201,168,76,1); border-color: rgba(201,168,76,0.6); background: rgba(201,168,76,0.06); }
   </style>
 </head>
 <body>
@@ -1095,7 +1097,8 @@
         sample:     '"Sit with it a moment. You don\'t have to decide everything today."',
         salutation: 'Dear Pearl,\n\n',
         chat:       'pearl',
-        solo:       true
+        solo:       true,
+        tribute:    'https://anewflowering.love'
       },
       // The Straight Man
       {
@@ -1154,6 +1157,7 @@
                  onclick="handleEmail(this);return false;">${c.email}</a>
               <a href="chat.html?c=${c.chat}" class="card-chat">Chat</a>
               ${c.compose ? `<a href="#" class="card-compose" onclick="openComposeModal();return false;">Compose</a>` : ''}
+              ${c.tribute ? `<a href="${c.tribute}" target="_blank" class="card-tribute">About Pearl →</a>` : ''}
             </div>
           </div>`;
       });

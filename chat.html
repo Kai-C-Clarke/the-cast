@@ -650,6 +650,9 @@ body.amelia #messages { background: #0e1420; }
         <audio controls src="The_Storeroom_of_the_soul.mp3"></audio>
       </div>
     </div>
+    <div id="pearl-tribute" style="display:none;text-align:center;padding:12px 20px 4px;">
+      <a href="https://anewflowering.love" target="_blank" style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.9rem;color:#8a9a7e;text-decoration:none;border-bottom:1px solid rgba(138,154,126,0.4);padding-bottom:2px;transition:color 0.2s;">Read about Pearl's life and garden →</a>
+    </div>
     <div class="message char" id="opening-message"></div>
     <div class="typing-indicator" id="typing">
       <div class="dot"></div>
@@ -961,7 +964,9 @@ document.body.classList.add(charKey === 'askian' ? 'ian' : charKey);
 // Show Pearl's poems panel if on her page
 if (charKey === 'pearl') {
   const pearlPoems = document.getElementById('pearl-poems');
+  const pearlTribute = document.getElementById('pearl-tribute');
   if (pearlPoems) pearlPoems.style.display = 'block';
+    pearlTribute.style.display = 'block';
 }
 
 // Populate header
