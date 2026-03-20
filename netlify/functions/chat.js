@@ -178,7 +178,7 @@ exports.handler = async function(event, context) {
 
     // ── 6. Langfuse trace ──
     sendLangfuseTrace({
-      name: 'wire-chat',
+      name: character ? `chat-${character}` : 'wire-chat',
       input: { system_prompt: system_prompt?.slice(0, 200), messages },
       output: reply,
       model: data.model,
