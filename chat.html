@@ -620,7 +620,7 @@ body.amelia #messages { background: #0e1420; }
       <p id="char-desc"></p>
     </div>
     <a href="index.html" id="back-link">← Back to The Cast</a>
-    <button id="sound-toggle" style="display:none;background:none;border:none;cursor:pointer;font-size:1.8rem;opacity:0.8;transition:opacity 0.2s;margin-left:8px;" title="Sound on">📻</button>
+    <button id="sound-toggle" style="display:none;background:none;border:none;cursor:pointer;font-size:1.8rem;opacity:0.8;transition:opacity 0.2s;margin-left:8px;" title="Sound on — click to mute">📻</button>
   </div>
 
   <div id="pearl-photos">
@@ -1004,6 +1004,11 @@ const VOICED_CHARS = ['dave'];
 let soundOn = true;
 let audioUnlocked = false;
 
+// Pre-baked opening audio files per character
+const OPENING_AUDIO = {
+  dave: 'dave_opening.mp3'
+};
+
 // Show 📻 toggle for voiced characters
 if (VOICED_CHARS.includes(charKey)) {
   const toggleBtn = document.getElementById('sound-toggle');
@@ -1016,11 +1021,39 @@ if (VOICED_CHARS.includes(charKey)) {
       toggleBtn.style.opacity = soundOn ? '0.8' : '0.4';
     });
   }
+  // Play pre-baked opening immediately on page load — no API call needed
+  if (OPENING_AUDIO[charKey]) {
+    const openingAudio = new Audio(OPENING_AUDIO[charKey]);
+    openingAudio.play().catch(() => {
+      // Autoplay blocked — play on first interaction instead
+      const playOnInteract = () => {
+        if (soundOn) openingAudio.play().catch(() => {});
+      };
+      document.addEventListener('click',   playOnInteract, { once: true });
+      document.addEventListener('keydown', playOnInteract, { once: true });
+    });
+  }
 }
+
+// Unlock AudioContext on first interaction for subsequent TTS replies
+const unlockAudio = () => {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    ctx.resume();
+  } catch(e) {}
+};
+document.addEventListener('click',   unlockAudio, { once: true });
+document.addEventListener('keydown', unlockAudio, { once: true });
 
 async function speakText(text, character) {
   if (!soundOn) return;
-  console.log('[tts] calling for:', character);
   try {
     const res = await fetch('/.netlify/functions/tts', {
       method: 'POST',
@@ -1028,43 +1061,18 @@ async function speakText(text, character) {
       body: JSON.stringify({ text, character })
     });
     const data = await res.json();
-    if (!data.audio) { console.log('[tts] no audio in response'); return; }
+    if (!data.audio) return;
     const binary = atob(data.audio);
     const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'audio/mpeg' });
-    const url  = URL.createObjectURL(blob);
+    const blob  = new Blob([bytes], { type: 'audio/mpeg' });
+    const url   = URL.createObjectURL(blob);
     const audio = new Audio(url);
     audio.onended = () => URL.revokeObjectURL(url);
-    const playPromise = audio.play();
-    if (playPromise) playPromise.catch(e => console.log('[tts] play blocked:', e.message));
+    audio.play().catch(e => console.log('[tts] play blocked:', e.message));
   } catch(e) {
     console.log('[tts] error:', e.message);
   }
-}
-
-// On first interaction: unlock AudioContext, speak opening
-if (VOICED_CHARS.includes(charKey)) {
-  const unlockAndGreet = () => {
-    if (audioUnlocked) return;
-    audioUnlocked = true;
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const buf = ctx.createBuffer(1, 1, 22050);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start(0);
-      ctx.resume();
-    } catch(e) { console.log('[tts] AudioContext error:', e); }
-    const openingEl = document.getElementById('opening-message');
-    if (openingEl && openingEl.textContent.trim()) {
-      speakText(openingEl.textContent.trim(), charKey);
-    }
-  };
-  document.addEventListener('click',      unlockAndGreet, { once: true });
-  document.addEventListener('keydown',    unlockAndGreet, { once: true });
-  document.addEventListener('touchstart', unlockAndGreet, { once: true });
 }
 
 function addMessage(text, role) {
