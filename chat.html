@@ -974,7 +974,15 @@ document.getElementById('char-avatar').src = char.avatar;
 document.getElementById('char-avatar').alt = char.name;
 document.getElementById('char-name').textContent = char.name;
 document.getElementById('char-desc').textContent = char.desc;
-document.getElementById('opening-message').textContent = char.opening;
+// Route opening message through addMessage so voiced chars get speaker button
+const openingEl = document.getElementById('opening-message');
+if (VOICED_CHARS.includes(charKey)) {
+  // Use addMessage to get the speaker button
+  openingEl.remove(); // remove placeholder, addMessage will insert before typingEl
+  addMessage(char.opening, 'char');
+} else {
+  openingEl.textContent = char.opening;
+}
 document.getElementById('user-input').placeholder = char.placeholder;
 document.getElementById('send-btn').textContent = char.sendLabel;
 document.title = `Chat with ${char.name} — The Cast`;
