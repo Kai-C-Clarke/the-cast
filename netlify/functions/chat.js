@@ -176,15 +176,17 @@ exports.handler = async function(event, context) {
     // ── 5. Log ──
     console.log(`[chat.js] Model: ${data.model} | Tokens: ${data.usage?.total_tokens || '?'} | User: ${user_id || 'anonymous'} | Memories: ${memoriesContext ? 'yes' : 'none'}`);
 
-    // ── 6. Langfuse trace ──
-    sendLangfuseTrace({
-      name: character ? `chat-${character}` : 'wire-chat',
-      input: { system_prompt: system_prompt?.slice(0, 200), messages },
-      output: reply,
-      model: data.model,
-      usage: data.usage,
-      metadata: { source: 'thecast.chat', function: 'chat', user_id, character }
-    });
+    // ── 6. Langfuse trace — awaited so it completes before function exits ──
+    try {
+      await sendLangfuseTrace({
+        name: character ? `chat-${character}` : 'wire-chat',
+        input: { system_prompt: system_prompt?.slice(0, 200), messages },
+        output: reply,
+        model: data.model,
+        usage: data.usage,
+        metadata: { source: 'thecast.chat', function: 'chat', user_id, character }
+      });
+    } catch(e) { console.log(`[langfuse] trace error: ${e.message}`); }
 
     return {
       statusCode: 200,
