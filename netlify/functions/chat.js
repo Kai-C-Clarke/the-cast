@@ -22,8 +22,10 @@ function mem0Request(method, path, body) {
       method,
       headers: {
         'Authorization': `Token ${MEM0_API_KEY}`,
-        'Content-Type': 'application/json',
-        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {})
+        ...(payload ? {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
+        } : {})
       }
     };
     const req = https.request(options, (res) => {
@@ -34,7 +36,7 @@ function mem0Request(method, path, body) {
         catch { resolve(null); }
       });
     });
-    req.on('error', () => resolve(null)); // silent — never block response
+    req.on('error', (e) => { console.log(`[mem0] ${method} ${path} error: ${e.message}`); resolve(null); });
     if (payload) req.write(payload);
     req.end();
   });
@@ -56,8 +58,13 @@ async function getAllMemories(userId) {
   if (!MEM0_API_KEY || !userId) return [];
   try {
     const result = await mem0Request('GET', `/v1/memories/?user_id=${encodeURIComponent(userId)}&limit=10`, null);
-    return result?.results || [];
-  } catch { return []; }
+    console.log(`[mem0] getAllMemories result: ${JSON.stringify(result)?.slice(0, 200)}`);
+    if (Array.isArray(result)) return result;
+    return result?.results || result?.memories || [];
+  } catch (e) {
+    console.log(`[mem0] getAllMemories error: ${e.message}`);
+    return [];
+  }
 }
 
 async function addMemory(userId, messages, agentId) {
