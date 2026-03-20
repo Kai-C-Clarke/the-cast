@@ -620,6 +620,7 @@ body.amelia #messages { background: #0e1420; }
       <p id="char-desc"></p>
     </div>
     <a href="index.html" id="back-link">← Back to The Cast</a>
+    <button id="sound-toggle" style="display:none;background:none;border:none;cursor:pointer;font-size:1.8rem;opacity:0.8;transition:opacity 0.2s;margin-left:8px;" title="Sound on — click to mute">📻</button>
   </div>
 
   <div id="pearl-photos">
@@ -998,46 +999,29 @@ const inputEl = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
 const typingEl = document.getElementById('typing');
 
-// Characters with TTS voice available
+// ── TTS ──────────────────────────────────────────────────────────────────────
 const VOICED_CHARS = ['dave'];
+let soundOn = true;
+const sharedAudio = new Audio();
+let audioUnlocked = false;
 
-function addMessage(text, role) {
-  const div = document.createElement('div');
-  div.className = `message ${role}`;
-
-  // Add speaker button for voiced characters
-  if (role === 'char' && VOICED_CHARS.includes(charKey)) {
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display:flex;align-items:flex-start;gap:8px;';
-
-    const textSpan = document.createElement('span');
-    textSpan.textContent = text;
-
-    const speakBtn = document.createElement('button');
-    speakBtn.textContent = '🔊';
-    speakBtn.title = 'Hear this';
-    speakBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:1rem;opacity:0.6;flex-shrink:0;padding:2px 0 0 0;transition:opacity 0.2s;';
-    speakBtn.onmouseover = () => speakBtn.style.opacity = '1';
-    speakBtn.onmouseout  = () => speakBtn.style.opacity = '0.6';
-    speakBtn.onclick = () => speakText(text, charKey, speakBtn);
-
-    wrapper.appendChild(textSpan);
-    wrapper.appendChild(speakBtn);
-    div.appendChild(wrapper);
-  } else {
-    div.textContent = text;
+// Show 📻 toggle only for voiced characters
+if (VOICED_CHARS.includes(charKey)) {
+  const toggleBtn = document.getElementById('sound-toggle');
+  if (toggleBtn) {
+    toggleBtn.style.display = 'inline-block';
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      soundOn = !soundOn;
+      toggleBtn.textContent = soundOn ? '📻' : '🔇';
+      toggleBtn.title = soundOn ? 'Sound on — click to mute' : 'Muted — click to unmute';
+      toggleBtn.style.opacity = soundOn ? '0.8' : '0.4';
+    });
   }
-
-  messagesEl.insertBefore(div, typingEl);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// TTS — call Netlify function, play returned audio
-async function speakText(text, character, btn) {
-  if (btn.dataset.playing) return;
-  btn.dataset.playing = '1';
-  btn.textContent = '⏳';
-
+async function speakText(text, character) {
+  if (!soundOn) return;
   try {
     const res = await fetch('/.netlify/functions/tts', {
       method: 'POST',
@@ -1045,25 +1029,46 @@ async function speakText(text, character, btn) {
       body: JSON.stringify({ text, character })
     });
     const data = await res.json();
-    if (!data.audio) throw new Error('No audio returned');
-
-    // Decode base64 and play
+    if (!data.audio) return;
     const binary = atob(data.audio);
     const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob   = new Blob([bytes], { type: 'audio/mpeg' });
-    const url    = URL.createObjectURL(blob);
-    const audio  = new Audio(url);
-    btn.textContent = '🔊';
-    audio.play();
-    audio.onended = () => {
-      URL.revokeObjectURL(url);
-      delete btn.dataset.playing;
-    };
+    const blob = new Blob([bytes], { type: 'audio/mpeg' });
+    const url  = URL.createObjectURL(blob);
+    sharedAudio.src = url;
+    sharedAudio.onended = () => URL.revokeObjectURL(url);
+    await sharedAudio.play();
   } catch(e) {
     console.log('[tts] error:', e.message);
-    btn.textContent = '🔊';
-    delete btn.dataset.playing;
+  }
+}
+
+// Unlock audio on first interaction, then speak opening message
+if (VOICED_CHARS.includes(charKey)) {
+  const unlockAudio = () => {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    sharedAudio.play().then(() => {
+      sharedAudio.pause();
+      sharedAudio.currentTime = 0;
+      const openingEl = document.getElementById('opening-message');
+      if (openingEl && openingEl.textContent.trim()) {
+        speakText(openingEl.textContent.trim(), charKey);
+      }
+    }).catch(() => {});
+  };
+  document.addEventListener('click', unlockAudio, { once: true });
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+}
+
+function addMessage(text, role) {
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  div.textContent = text;
+  messagesEl.insertBefore(div, typingEl);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (role === 'char' && VOICED_CHARS.includes(charKey)) {
+    speakText(text, charKey);
   }
 }
 
