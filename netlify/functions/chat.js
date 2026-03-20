@@ -46,8 +46,16 @@ async function searchMemories(userId, query) {
     const result = await mem0Request('POST', '/v1/memories/search/', {
       query,
       user_id: userId,
-      limit: 5
+      limit: 8
     });
+    return result?.results || [];
+  } catch { return []; }
+}
+
+async function getAllMemories(userId) {
+  if (!MEM0_API_KEY || !userId) return [];
+  try {
+    const result = await mem0Request('GET', `/v1/memories/?user_id=${encodeURIComponent(userId)}&limit=10`, null);
     return result?.results || [];
   } catch { return []; }
 }
@@ -106,11 +114,23 @@ exports.handler = async function(event, context) {
 
     // ── 1. Retrieve relevant memories for this user ──
     let memoriesContext = '';
-    if (user_id && messages?.length > 0) {
-      const lastUserMsg = messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
-      const memories = await searchMemories(user_id, lastUserMsg);
+    if (user_id) {
+      // Build a broad query combining recent messages for better semantic matching
+      const recentUserMsgs = (messages || [])
+        .filter(m => m.role === 'user')
+        .slice(-3)
+        .map(m => m.content)
+        .join(' ');
+      const broadQuery = `${recentUserMsgs} previous conversations projects interests repairs`.trim();
+
+      // Search with broad query, fall back to fetching all memories if none found
+      let memories = await searchMemories(user_id, broadQuery);
+      if (memories.length === 0) {
+        memories = await getAllMemories(user_id);
+      }
+
       if (memories.length > 0) {
-        memoriesContext = '\n\nWhat you remember about this person:\n' +
+        memoriesContext = '\n\nWhat you remember about this person from previous conversations:\n' +
           memories.map(m => `- ${m.memory}`).join('\n') + '\n';
       }
     }
