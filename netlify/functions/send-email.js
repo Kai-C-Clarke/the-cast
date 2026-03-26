@@ -106,7 +106,7 @@ exports.handler = async function (event) {
     }
 
     // Only allow sending to known cast addresses
-    const allowed = ['henry','tesla','shakespeare','ada','davinci','churchill','cleopatra','brunel','amelia','dave','chantelle','jade','tarquin','pearl','askian','tomita','thecast'];
+    const allowed = ['henry','tesla','shakespeare','ada','davinci','churchill','cleopatra','brunel','amelia','dave','chantelle','jade','tarquin','pearl','askian','tomita','thecast','consilium'];
     const localPart = to.split('@')[0].toLowerCase();
     if (!allowed.includes(localPart)) {
       return { statusCode: 400, headers: CORS_HEADERS, body: JSON.stringify({ error: 'Invalid recipient' }) };
