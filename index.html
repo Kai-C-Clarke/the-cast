@@ -226,11 +226,14 @@
     }
 
     /* ── CONFUCIUS SECTION ── */
+    /* ── SAGE STAGE (Confucius + Consilium) ── */
     .confucius-section {
-      background: linear-gradient(180deg, var(--dark) 0%, #190d06 50%, var(--dark) 100%);
-      padding: 80px 20px;
       position: relative;
-      text-align: center;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 12%, rgba(124,63,21,0.18), transparent 28%),
+        radial-gradient(circle at 50% 74%, rgba(96,44,14,0.14), transparent 32%),
+        linear-gradient(180deg, var(--dark) 0%, #0b0503 50%, var(--dark) 100%);
     }
     .confucius-section::before, .confucius-section::after {
       content: '';
@@ -238,49 +241,187 @@
       left: 0; right: 0;
       height: 1px;
       background: linear-gradient(90deg, transparent, var(--gold), transparent);
-      opacity: 0.35;
+      opacity: 0.25;
     }
     .confucius-section::before { top: 0; }
     .confucius-section::after  { bottom: 0; }
 
-    .confucius-inner {
-      max-width: 600px;
+    .sage-stage {
+      width: min(1440px, 100%);
       margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      position: relative;
+    }
+    .sage-stage::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 7%;
+      bottom: 7%;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, rgba(214,176,86,0.14), transparent);
+      transform: translateX(-0.5px);
     }
 
-    .confucius-portrait-wrap {
+    .sage-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 88px 52px;
       position: relative;
-      width: 170px;
-      height: 170px;
+      overflow: hidden;
     }
-    .confucius-portrait-wrap::before {
+    .sage-panel::before {
       content: '';
       position: absolute;
-      inset: -5px;
-      border: 1px solid var(--gold);
-      border-radius: 50%;
-      opacity: 0.45;
+      inset: 10% 8%;
+      background: radial-gradient(circle at 50% 30%, rgba(130,70,26,0.18), transparent 46%);
+      filter: blur(10px);
+      pointer-events: none;
     }
-    .confucius-portrait-wrap::after {
-      content: '';
-      position: absolute;
-      inset: -12px;
-      border: 1px solid var(--gold);
-      border-radius: 50%;
-      opacity: 0.15;
+
+    .sage-content {
+      width: 100%;
+      max-width: 520px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
     }
-    .confucius-portrait {
-      width: 170px;
-      height: 170px;
+
+    .confucius-orb {
+      width: 188px;
+      height: 188px;
       border-radius: 50%;
+      margin: 0 auto 34px;
+      border: 1px solid rgba(214,176,86,0.22);
+      box-shadow: 0 0 0 11px rgba(214,176,86,0.035), 0 20px 60px rgba(0,0,0,0.35);
+      overflow: hidden;
+      position: relative;
+    }
+    .confucius-orb img {
+      width: 100%;
+      height: 100%;
       object-fit: cover;
       object-position: top center;
       display: block;
       filter: sepia(15%) contrast(1.05);
+    }
+
+    .consilium-frame {
+      width: min(280px, 70%);
+      aspect-ratio: 0.66;
+      margin: 0 auto 30px;
+      border-radius: 12px;
+      border: 1px solid rgba(214,176,86,0.34);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.03);
+      overflow: hidden;
+      position: relative;
+    }
+    .consilium-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+      filter: brightness(0.88) contrast(1.06);
+    }
+    .consilium-frame::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 28%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.38) 100%);
+      pointer-events: none;
+    }
+
+    .sage-eyebrow {
+      font-family: 'Oswald', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: #9a8158;
+      margin-bottom: 20px;
+    }
+    .sage-title {
+      margin: 0 0 26px;
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.4rem, 4vw, 3.2rem);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: #f2e8d7;
+    }
+    .sage-title em { color: var(--gold); font-style: italic; }
+
+    .sage-desc {
+      font-style: italic;
+      color: #baa07b;
+      font-size: 1rem;
+      max-width: 400px;
+      margin: 8px auto 36px;
+      line-height: 1.8;
+    }
+
+    .sage-ornament {
+      width: 160px;
+      height: 1px;
+      margin: 0 auto 34px;
+      background: linear-gradient(90deg, transparent, rgba(214,176,86,0.14), transparent);
+      position: relative;
+    }
+    .sage-ornament::before {
+      content: '◆';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -58%);
+      color: rgba(214,176,86,0.62);
+      font-size: 9px;
+      background: #0b0503;
+      padding: 0 6px;
+    }
+
+    .sage-btns {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .sage-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 260px;
+      padding: 16px 24px;
+      text-decoration: none;
+      text-transform: uppercase;
+      font-family: 'Oswald', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      border: 1px solid rgba(214,176,86,0.6);
+      transition: transform 180ms ease, filter 180ms ease, background 180ms ease;
+      cursor: pointer;
+    }
+    .sage-btn.primary {
+      background: linear-gradient(180deg, #ddbe67, #cfab48);
+      color: #1b1006;
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+    }
+    .sage-btn.secondary {
+      color: var(--gold);
+      background: rgba(0,0,0,0.12);
+    }
+    .sage-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
+
+    @media (max-width: 900px) {
+      .sage-stage { grid-template-columns: 1fr; }
+      .sage-stage::before { display: none; }
+      .sage-panel { padding: 64px 28px; }
+      .sage-panel + .sage-panel { border-top: 1px solid rgba(214,176,86,0.1); }
+    }
+    @media (max-width: 500px) {
+      .sage-btn { min-width: 100%; }
     }
 
     .confucius-tag {
@@ -292,7 +433,6 @@
       text-transform: uppercase;
       opacity: 0.7;
     }
-
     .confucius-desc {
       font-style: italic;
       color: var(--text-dim);
@@ -727,7 +867,8 @@
       Historical figures. Comic creations. All at your service.
     </p>
     <div class="cta-row">
-      <a href="#sage" class="cta-btn filled">Ask Confucius</a>
+      <a href="#sage" class="cta-btn filled">Consult Confucius</a>
+      <a href="#sage" class="cta-btn filled" style="background:linear-gradient(180deg,#ddbe67,#cfab48);color:#1b1006;border-color:rgba(214,176,86,0.6);">Consult Consilium</a>
       <a href="#cast" class="cta-btn">Meet the Cast</a>
       <a href="#how" class="cta-btn">How It Works</a>
     </div>
@@ -756,18 +897,43 @@
     </div>
   </section>
 
-  <!-- ── CONFUCIUS ── -->
+  <!-- ── CONFUCIUS + CONSILIUM ── -->
   <section class="confucius-section" id="sage">
-    <div class="confucius-inner reveal">
-      <div class="confucius-portrait-wrap">
-        <img src="confucius.png" class="confucius-portrait" alt="Confucius">
+    <div class="sage-stage">
+
+      <!-- Left: Confucius -->
+      <div class="sage-panel reveal">
+        <div class="sage-content">
+          <div class="confucius-orb">
+            <img src="confucius.png" alt="Confucius">
+          </div>
+          <div class="sage-eyebrow">The Master Voice</div>
+          <h2 class="sage-title">Consult <em>the Sage</em></h2>
+          <p class="sage-desc">He does not answer. He convenes. Bring him your question and he will send you to the two who know.</p>
+          <div class="sage-ornament"></div>
+          <div class="sage-btns">
+            <button class="sage-btn primary" id="askConfuciusBtn">Consult Confucius</button>
+          </div>
+        </div>
       </div>
-      <div>
-        <p class="confucius-tag">The Master Voice</p>
-        <h2 class="section-title" style="margin: 10px 0 16px;">Consult <em>the Sage</em></h2>
-        <p class="confucius-desc">He does not answer. He convenes. Bring him your question and he will send you to the two who know.</p>
+
+      <!-- Right: Consilium -->
+      <div class="sage-panel reveal">
+        <div class="sage-content">
+          <div class="consilium-frame">
+            <img src="consilium.png" alt="Consilium">
+          </div>
+          <div class="sage-eyebrow">Inter-AI Deliberation</div>
+          <h2 class="sage-title">Convene <em>Consilium</em></h2>
+          <p class="sage-desc">Four minds. One council. Deliberation, not reaction.</p>
+          <div class="sage-ornament"></div>
+          <div class="sage-btns">
+            <a href="chat.html?c=consilium" class="sage-btn primary">Chat with Consilium</a>
+            <a href="#" class="sage-btn secondary" data-email="consilium@askian.net" data-name="Consilium" onclick="handleEmail(this);return false;">Write to Consilium</a>
+          </div>
+        </div>
       </div>
-      <button class="cta-btn filled" id="askConfuciusBtn">Ask Confucius</button>
+
     </div>
   </section>
 
