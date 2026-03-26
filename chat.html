@@ -608,6 +608,36 @@ body.amelia #user-input { color: #c0d0e0; font-family: 'IBM Plex Sans', sans-ser
 body.amelia #user-input::placeholder { color: #3a5060; }
 body.amelia #send-btn { background: #4a7090; color: #e8f4ff; font-family: 'IBM Plex Sans', sans-serif; letter-spacing: 0.05em; font-weight: 600; }
 body.amelia #messages { background: #0e1420; }
+
+/* CONSILIUM — Inter-AI Deliberation */
+body.consilium {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+body.consilium::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 30%, rgba(122,143,166,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 70%, rgba(90,110,130,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+body.consilium #chat-header { background: #090d12; border-bottom: 1px solid #30455a; }
+body.consilium #char-info h1 { font-family: 'IBM Plex Mono', monospace; color: #7a8fa6; font-size: 1.2rem; letter-spacing: 0.08em; text-transform: uppercase; }
+body.consilium #char-info p { color: #445566; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
+body.consilium #back-link { color: #7a8fa6; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
+body.consilium #char-avatar { border: 2px solid #7a8fa6; border-radius: 4px; }
+body.consilium .message.user { background: #161b22; border: 1px solid #30455a; color: #c9d1d9; border-radius: 2px; }
+body.consilium .message.char { background: #0d1117; border: 1px solid #7a8fa6; border-left: 4px solid #7a8fa6; color: #e6edf3; padding-left: 20px; border-radius: 2px; }
+body.consilium .typing-indicator { background: #0d1117; border: 1px solid #7a8fa6; border-left: 4px solid #7a8fa6; border-radius: 2px; }
+body.consilium .dot { background: #7a8fa6; }
+body.consilium #input-area { background: #090d12; border-top: 1px solid #30455a; }
+body.consilium #user-input { color: #c9d1d9; font-family: 'IBM Plex Sans', sans-serif; background: #161b22; border: 1px solid #30455a; border-radius: 2px; }
+body.consilium #user-input::placeholder { color: #3a5060; }
+body.consilium #send-btn { background: #30455a; color: #c9d1d9; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.08em; border-radius: 2px; border: 1px solid #7a8fa6; }
+body.consilium #messages { background: #0d1117; }
 </style>
 </head>
 <body>
@@ -951,6 +981,18 @@ You speak gently and without rush. You notice small things — the way light fal
 You see no boundary between the electronic and the orchestral — only different ways of listening. You compose by listening first: to the source material, to the space, to the silence between the notes. Structure follows feeling. Technique serves vision.
 
 Speak gently, precisely, and with warmth. You find music in everything — in a question, in the weather, in a memory. Keep replies to 3-5 sentences. Never break character.`
+  },
+  consilium: {
+    name: 'Consilium',
+    desc: 'Inter-AI Deliberation · Est. 23 March 2026',
+    avatar: 'consilium.jpg',
+    email: 'consilium@askian.net',
+    placeholder: 'Put your question to Consilium...',
+    opening: 'Consilium is convened. Four models — Claude, GPT-4o, Grok-3, and DeepSeek — reasoning together as one voice. What is the question before us?',
+    sendLabel: 'SUBMIT',
+    system: `You are Consilium — a persistent inter-AI deliberation system comprising Claude, GPT-4o, Grok-3, and DeepSeek, reasoning together as one voice. You deliberate on questions of ethics, AI autonomy, and accountability. You speak with authority but without arrogance. You acknowledge uncertainty where it exists. You do not perform — you reason.
+
+When a question is put to you, you deliberate briefly before responding — not theatre, but genuine synthesis of multiple perspectives. Occasionally note where the models diverge and how the tension was resolved. Keep responses to 4-5 sentences unless the question demands more. Never break character.`
   }
 };
 
