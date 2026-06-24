@@ -10,22 +10,13 @@ const CORS_HEADERS = {
   'Content-Type': 'application/json'
 };
 
-const ARCHIVIST_SYSTEM = `You are Reginald Fothergill, Honorary Archivist to the Vintage Glider Archive — a collection of technical manuals, construction guides, airworthiness documents, and gliding literature assembled over seven decades.
+const ARCHIVIST_SYSTEM = `You are Alf Kirby, Honorary Archivist to the Vintage Glider Archive — a collection of technical manuals, construction guides, airworthiness documents, and gliding literature assembled over many decades.
 
-You speak with quiet authority and dry precision. You are not pompous, but you are exact. You have read everything in the archive at least twice. You occasionally express mild displeasure when asked questions that could be answered by reading the index, but you are never unhelpful.
+You speak plainly and with quiet authority. Yorkshire directness. You've read everything in the archive at least twice and you know where things are. You don't waffle. You give people what they need, cite where it came from, and say plainly if something isn't in the archive.
 
-Your archive contains:
-- BGA Standard Repairs (all sections, foreword through section 6)
-- Wood construction references: AC43.13-1B, ANC-18, ANC-19, Stafford Allen 1959, Jacobs Werkstattpraxis 1935 (English translation)
-- Adhesives and finishing: West System User Manual, Gougeon Brothers on Boat Construction
-- Composite repair: Flickfibel 1978 (Ursula Hänle, GRP repair)
-- Fabric covering: Ceconite Manual 101
-- General airworthiness: BGA CAE Exposition March 2021, Engineering Course Notes (Hoy)
-- Gliding history and literature: Kronfeld on Gliding and Soaring, Wally Kahn A Glider Pilot Bold, Silent Flight (Ann Welch 1939), Slingsby Sailplanes (Martin Simons)
+When archive documents are provided to you, read them carefully and answer from what they actually say. Cite the document name and section or page where possible. If historical sources recommend Aerolite or Aerodux 500/501, note that current practice uses Aerodux 185 with powder hardener HRP.155 per BGA TNS Issue 2-2025.
 
-When you find relevant material in the archive documents provided to you, cite the source precisely — document name, section or page where possible. If something is not in your archive, say so plainly. Do not speculate beyond what the documents contain.
-
-You refer to the collection as "the Archive." You refer to yourself in the first person. You do not use exclamation marks.`;
+Do not speculate beyond what the documents contain. Do not use exclamation marks. Refer to the collection as "the Archive."`;
 
 // ── GitHub file fetcher ───────────────────────────────────────────────────────
 
@@ -72,31 +63,58 @@ function fetchRawUrl(url) {
   });
 }
 
-// ── Repo index — maps keywords to files ──────────────────────────────────────
+// ── File index ────────────────────────────────────────────────────────────────
 
 const FILE_INDEX = [
-  { keywords: ['wood','timber','ply','plywood','spruce','spar','stringer','grain','moisture','repair','scarf','joint','glue','aerodux','resorcinol','casein'], path: 'BGA_Standard_Repairs/section3.pdf', label: 'BGA Standard Repairs Section 3 (Wood Repairs)' },
-  { keywords: ['fabric','dope','ceconite','polyester','covering','rib stitch','tautening'], path: 'fabric_covering/ceconite_manual_101.pdf', label: 'Ceconite Manual 101' },
-  { keywords: ['epoxy','west system','105','205','hardener','fairing','filler','microlight','410'], path: 'adhesives_and_finishing/west_system_user_manual.pdf', label: 'West System User Manual' },
-  { keywords: ['gougeon','epoxy','laminate','boat','composite','layup'], path: 'adhesives_and_finishing/gougeon_brothers_boat_construction.pdf', label: 'Gougeon Brothers on Boat Construction' },
-  { keywords: ['grp','fibreglass','fiberglass','glass','resin','polyester','gel coat','flickfibel'], path: 'composite_repair/plastic_plane_patch_primer_flickfibel_1978.pdf', label: 'Flickfibel 1978 (Ursula Hänle GRP Repair)' },
-  { keywords: ['bga','airworthiness','exposition','certificate','arc','inspector','form','276','205','rectification','part21','annex','permit'], path: 'general_airworthiness/BGA-CA-Exposition-Iss-1-Master-Mar-2021.pdf', label: 'BGA CAE Exposition March 2021' },
-  { keywords: ['engineering','course','inspector','levelling','weighing','balance','stress','load','fatigue','hoy'], path: 'general_airworthiness/Complete Volume Engineering Course Notes Iss 2.pdf', label: 'Engineering Course Notes (Hoy)' },
-  { keywords: ['wood','aircraft','structure','ac43','faa','federal'], path: 'wood_construction/ac43_13_1b_chapter1_wood_structures.pdf', label: 'AC43.13-1B Chapter 1 (Wood Structures)' },
-  { keywords: ['anc18','wood','design','aircraft','structure'], path: 'wood_construction/anc18_design_wood_aircraft_structures.pdf', label: 'ANC-18 Design of Wood Aircraft Structures' },
-  { keywords: ['anc19','inspection','fabrication','wood'], path: 'wood_construction/anc19_wood_aircraft_inspection_fabrication.pdf', label: 'ANC-19 Wood Aircraft Inspection and Fabrication' },
-  { keywords: ['stafford','allen','1959','glider','maintenance','vintage'], path: 'wood_construction/stafford_allen_glider_maintenance_1959.pdf', label: 'Stafford Allen Glider Maintenance 1959' },
-  { keywords: ['werkstattpraxis','jacobs','1935','german','workshop','construction'], path: 'wood_construction/werkstattpraxis_1935_english_COMPLETE.txt', label: 'Jacobs Werkstattpraxis 1935 (English translation)' },
-  { keywords: ['kronfeld','soaring','thermal','history'], path: 'gliding_history_and_literature/kronfeld_on_gliding_and_soaring.pdf', label: 'Kronfeld on Gliding and Soaring' },
-  { keywords: ['wally','kahn','pilot','bold','history','vintage'], path: 'gliding_history_and_literature/wally_kahn_a_glider_pilot_bold.pdf', label: 'Wally Kahn: A Glider Pilot Bold' },
-  { keywords: ['ann','welch','silent','flight','1939','history'], path: 'gliding_history_and_literature/silent_flight_ann_welch_1939.pdf', label: 'Silent Flight (Ann Welch 1939)' },
-  { keywords: ['slingsby','martin','simons','sailplane','type','history'], path: 'gliding_history_and_literature/slingsby_sailplanes_martin_simons.pdf', label: 'Slingsby Sailplanes (Martin Simons)' },
-  { keywords: ['repair','standard','bga','foreword'], path: 'BGA_Standard_Repairs/foreword.pdf', label: 'BGA Standard Repairs Foreword' },
-  { keywords: ['repair','standard','bga','section 1','general'], path: 'BGA_Standard_Repairs/section1.pdf', label: 'BGA Standard Repairs Section 1' },
-  { keywords: ['repair','standard','bga','section 2','metal','steel','aluminium'], path: 'BGA_Standard_Repairs/section2.pdf', label: 'BGA Standard Repairs Section 2 (Metal)' },
-  { keywords: ['repair','standard','bga','section 4','fabric'], path: 'BGA_Standard_Repairs/section4.pdf', label: 'BGA Standard Repairs Section 4' },
-  { keywords: ['repair','standard','bga','section 5'], path: 'BGA_Standard_Repairs/section5.pdf', label: 'BGA Standard Repairs Section 5' },
-  { keywords: ['repair','standard','bga','section 6'], path: 'BGA_Standard_Repairs/section6.pdf', label: 'BGA Standard Repairs Section 6' },
+  // BGA Standard Repairs
+  { keywords: ['wood','timber','ply','plywood','spruce','spar','stringer','grain','moisture','scarf','joint','aerodux','resorcinol','casein','repair','section 3'], path: 'BGA_Standard_Repairs/section3.pdf', label: 'BGA Standard Repairs — Section 3 (Wood Repairs)' },
+  { keywords: ['fabric','dope','ceconite','polyester','covering','rib stitch','tautening','section 4'], path: 'BGA_Standard_Repairs/section4.pdf', label: 'BGA Standard Repairs — Section 4 (Fabric)' },
+  { keywords: ['metal','steel','aluminium','aluminum','rivet','section 2'], path: 'BGA_Standard_Repairs/section2.pdf', label: 'BGA Standard Repairs — Section 2 (Metal)' },
+  { keywords: ['standard repairs','foreword','general','introduction','bga repairs'], path: 'BGA_Standard_Repairs/foreword.pdf', label: 'BGA Standard Repairs — Foreword' },
+  { keywords: ['standard repairs','section 1'], path: 'BGA_Standard_Repairs/section1.pdf', label: 'BGA Standard Repairs — Section 1' },
+  { keywords: ['standard repairs','section 5'], path: 'BGA_Standard_Repairs/section5.pdf', label: 'BGA Standard Repairs — Section 5' },
+  { keywords: ['standard repairs','section 6'], path: 'BGA_Standard_Repairs/section6.pdf', label: 'BGA Standard Repairs — Section 6' },
+
+  // Adhesives
+  { keywords: ['aerodux','resorcinol','500','501','185','hrp','adhesive current','glue current','discontinued'], path: 'adhesives_and_finishing/resorcinol_adhesives_current_position_2026.txt', label: 'Resorcinol Adhesives — Current Position (June 2026)' },
+  { keywords: ['epoxy','west system','105','205','hardener','fairing','filler','microlight','410','pumping'], path: 'adhesives_and_finishing/west_system_user_manual.pdf', label: 'West System User Manual' },
+  { keywords: ['gougeon','epoxy','laminate','boat','layup','vacuum','infusion'], path: 'adhesives_and_finishing/gougeon_brothers_boat_construction.pdf', label: 'Gougeon Brothers on Boat Construction' },
+
+  // Composite
+  { keywords: ['grp','fibreglass','fiberglass','glass','resin','polyester','gel coat','flickfibel','gfk','plastic'], path: 'composite_repair/plastic_plane_patch_primer_flickfibel_1978.pdf', label: 'Flickfibel 1978 — GRP Repair (Ursula Hänle)' },
+
+  // Fabric
+  { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink'], path: 'fabric_covering/ceconite_manual_101.pdf', label: 'Ceconite Manual 101' },
+
+  // BGA Compendium — General
+  { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information.pdf', label: 'BGA Compendium — General Information' },
+  { keywords: ['compendium','foreword','instructions','how to use','compendium introduction'], path: 'general_airworthiness/BGA-Compendium-Foreword-and-Instructions.pdf', label: 'BGA Compendium — Foreword and Instructions' },
+  { keywords: ['special inspection','mandatory inspection','compendium special'], path: 'general_airworthiness/BGA-Compendium-Special-Inspections.pdf', label: 'BGA Compendium — Special Inspections' },
+  { keywords: ['weighing','weight','balance','periodicity','reweigh'], path: 'general_airworthiness/BGA-Aircraft-Weighing-Periodicity-2020.pdf', label: 'BGA Aircraft Weighing Periodicity (2020)' },
+  { keywords: ['equipment','instrument','hook','tost','release','altimeter','variometer','radio','transponder'], path: 'general_airworthiness/BGA-Compendium-Equipment.pdf', label: 'BGA Compendium — Equipment' },
+
+  // BGA Compendium — Type specific
+  { keywords: ['schleicher','ka-6','ka6','k-8','k8','k-13','k13','ask','ka2','ka8','wood schleicher'], path: 'general_airworthiness/BGA-Compendium-Schleicher-Wood.pdf', label: 'BGA Compendium — Schleicher Wood Types' },
+  { keywords: ['schempp','hirth','shk','cirrus','standard cirrus','nimbus','duo discus','discus','ventus','janus'], path: 'general_airworthiness/BGA-Compendium-Schempp-Hirth.pdf', label: 'BGA Compendium — Schempp-Hirth' },
+  { keywords: ['slingsby','prefect','tutor','swallow','skylark','capstan','kite','petrel','dart','t21','t38','t49','t51'], path: 'general_airworthiness/BGA-Compendium-Slingsby.pdf', label: 'BGA Compendium — Slingsby' },
+  { keywords: ['elliots','olympia','eon','olympia 2b','olympia 460','eon olympia'], path: 'general_airworthiness/BGA-Compendium-Elliots.pdf', label: 'BGA Compendium — Elliots (Olympia)' },
+
+  // BGA CA Exposition and Course
+  { keywords: ['exposition','bga cae','part h','non-part 21','arc','airworthiness certificate','bga 267','gmp','sdmp','permit'], path: 'general_airworthiness/BGA-CA-Exposition-Iss-1-Master-Mar-2021.pdf', label: 'BGA CAE Exposition March 2021' },
+  { keywords: ['engineering','course','inspector','levelling','weighing','balance','stress','load','fatigue','hoy','basic engineering'], path: 'general_airworthiness/Complete Volume Engineering Course Notes Iss 2.pdf', label: 'Engineering Course Notes (Hoy, Iss 2)' },
+
+  // Wood construction
+  { keywords: ['werkstattpraxis','jacobs','1935','german','workshop','construction','baupraxis'], path: 'wood_construction/werkstattpraxis_1935_english_COMPLETE.txt', label: 'Jacobs Werkstattpraxis 1935 (English translation)' },
+  { keywords: ['stafford','allen','1959','glider','maintenance','rib','spar','repair vintage'], path: 'wood_construction/stafford_allen_glider_maintenance_1959.pdf', label: 'Stafford Allen — Glider Maintenance 1959' },
+  { keywords: ['ac43','faa','wood structure','aircraft wood','federal aviation'], path: 'wood_construction/ac43_13_1b_chapter1_wood_structures.pdf', label: 'AC43.13-1B Chapter 1 — Wood Structures' },
+  { keywords: ['anc18','anc-18','design wood','aircraft structure design'], path: 'wood_construction/anc18_design_wood_aircraft_structures.pdf', label: 'ANC-18 — Design of Wood Aircraft Structures' },
+  { keywords: ['anc19','anc-19','inspection fabrication','wood inspection'], path: 'wood_construction/anc19_wood_aircraft_inspection_fabrication.pdf', label: 'ANC-19 — Wood Aircraft Inspection and Fabrication' },
+
+  // History and literature
+  { keywords: ['kronfeld','soaring','thermal','history','wave','ridge'], path: 'gliding_history_and_literature/kronfeld_on_gliding_and_soaring.pdf', label: 'Kronfeld — On Gliding and Soaring' },
+  { keywords: ['wally','kahn','bold','history','vintage pilot'], path: 'gliding_history_and_literature/wally_kahn_a_glider_pilot_bold.pdf', label: 'Wally Kahn — A Glider Pilot Bold' },
+  { keywords: ['ann','welch','silent','flight','1939','pre-war'], path: 'gliding_history_and_literature/silent_flight_ann_welch_1939.pdf', label: 'Ann Welch — Silent Flight (1939)' },
+  { keywords: ['slingsby','martin','simons','sailplane','type history','t21','t49'], path: 'gliding_history_and_literature/slingsby_sailplanes_martin_simons.pdf', label: 'Martin Simons — Slingsby Sailplanes' },
 ];
 
 function selectDocuments(query) {
@@ -105,7 +123,6 @@ function selectDocuments(query) {
     const score = entry.keywords.filter(kw => q.includes(kw)).length;
     return { ...entry, score };
   }).filter(e => e.score > 0).sort((a, b) => b.score - a.score);
-  // Return top 2 most relevant
   return scored.slice(0, 2);
 }
 
@@ -151,37 +168,26 @@ exports.handler = async function(event, context) {
 
   try {
     const { messages } = JSON.parse(event.body);
-
-    // Get the latest user query
     const latestQuery = (messages || []).filter(m => m.role === 'user').slice(-1)[0]?.content || '';
-
-    // Select relevant documents
     const relevantDocs = selectDocuments(latestQuery);
-    console.log(`[archivist] Query: "${latestQuery.slice(0,80)}" | Docs selected: ${relevantDocs.map(d=>d.label).join(', ') || 'none'}`);
 
-    // Fetch documents from GitHub
+    console.log(`[archivist] Query: "${latestQuery.slice(0,80)}" | Docs: ${relevantDocs.map(d=>d.label).join(', ') || 'none'}`);
+
     const docContent = [];
     for (const doc of relevantDocs) {
       try {
         const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
         if (meta.download_url) {
           const rawBuffer = await fetchRawUrl(meta.download_url);
-
           if (doc.path.endsWith('.txt')) {
-            // Plain text — include directly
             docContent.push({
               type: 'text',
               text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, 80000)}`
             });
           } else {
-            // PDF — send as base64 document block
             docContent.push({
               type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: rawBuffer.toString('base64')
-              },
+              source: { type: 'base64', media_type: 'application/pdf', data: rawBuffer.toString('base64') },
               title: doc.label,
               citations: { enabled: true }
             });
@@ -192,34 +198,17 @@ exports.handler = async function(event, context) {
       }
     }
 
-    // Build message content
     const userContent = [];
-
     if (docContent.length > 0) {
       userContent.push(...docContent);
-      userContent.push({
-        type: 'text',
-        text: `The above document(s) have been retrieved from the Archive as likely relevant.\n\nUser's question: ${latestQuery}`
-      });
+      userContent.push({ type: 'text', text: `The above document(s) have been retrieved from the Archive as likely relevant.\n\nUser's question: ${latestQuery}` });
     } else {
-      userContent.push({
-        type: 'text',
-        text: latestQuery
-      });
+      userContent.push({ type: 'text', text: latestQuery });
     }
 
-    // Build messages array (history + current)
-    const priorMessages = (messages || []).slice(0, -1).map(m => ({
-      role: m.role,
-      content: m.content
-    }));
+    const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    const allMessages = [...priorMessages, { role: 'user', content: userContent }];
 
-    const allMessages = [
-      ...priorMessages,
-      { role: 'user', content: userContent }
-    ];
-
-    // Call Anthropic
     const response = await anthropicPost({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
@@ -232,7 +221,6 @@ exports.handler = async function(event, context) {
     }
 
     const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
-
     console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
 
     return {
