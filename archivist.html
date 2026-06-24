@@ -324,6 +324,22 @@ body {
   font-style: normal;
 }
 
+
+.archive-contents li.folder-header {
+  color: var(--tan-light);
+  font-family: 'Special Elite', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding-left: 0;
+  margin-top: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(196,154,60,0.2);
+  padding-bottom: 3px;
+}
+.archive-contents li.folder-header::before { content: none; }
+.archive-contents li.loading-note { font-style: italic; color: var(--text-dim); }
+
 </style>
 </head>
 <body>
@@ -351,23 +367,7 @@ body {
 
   <div class="archive-contents">
     <h3>What's in the Archive</h3>
-    <ul>
-      <li>BGA Standard Repairs (all sections)</li>
-      <li>AC43.13-1B Wood Structures</li>
-      <li>ANC-18 &amp; ANC-19 Wood Aircraft</li>
-      <li>Stafford Allen Glider Maintenance 1959</li>
-      <li>Jacobs Werkstattpraxis 1935</li>
-      <li>West System User Manual</li>
-      <li>Gougeon Brothers Construction</li>
-      <li>Flickfibel 1978 (GRP Repair)</li>
-      <li>Ceconite Manual 101</li>
-      <li>BGA CAE Exposition 2021</li>
-      <li>Hoy Engineering Course Notes</li>
-      <li>Kronfeld on Gliding &amp; Soaring</li>
-      <li>Wally Kahn: A Glider Pilot Bold</li>
-      <li>Silent Flight — Ann Welch 1939</li>
-      <li>Slingsby Sailplanes — Martin Simons</li>
-    </ul>
+    <ul id="archive-list"><li class="loading-note">Loading archive contents...</li></ul>
   </div>
 
   <div class="disclaimer">
@@ -486,6 +486,88 @@ inputEl.addEventListener('input', () => {
   inputEl.style.height = 'auto';
   inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
 });
+
+// ── Dynamic archive contents ──────────────────────────────────────────────────
+const REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
+const FOLDERS = [
+  'BGA_Standard_Repairs',
+  'wood_construction',
+  'adhesives_and_finishing',
+  'composite_repair',
+  'fabric_covering',
+  'general_airworthiness',
+  'gliding_history_and_literature'
+];
+
+const FOLDER_LABELS = {
+  'BGA_Standard_Repairs': 'BGA Standard Repairs',
+  'wood_construction': 'Wood Construction',
+  'adhesives_and_finishing': 'Adhesives & Finishing',
+  'composite_repair': 'Composite Repair',
+  'fabric_covering': 'Fabric Covering',
+  'general_airworthiness': 'General Airworthiness',
+  'gliding_history_and_literature': 'Gliding History & Literature'
+};
+
+function formatFileName(name) {
+  return name
+    .replace(/\.pdf$|\.txt$/, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/Bga/g, 'BGA')
+    .replace(/Grp/g, 'GRP')
+    .replace(/Anc/g, 'ANC')
+    .replace(/Ac43/g, 'AC43')
+    .replace(/Cae/g, 'CAE');
+}
+
+async function loadArchiveContents() {
+  const list = document.getElementById('archive-list');
+  try {
+    // Fetch each folder in parallel
+    const results = await Promise.all(FOLDERS.map(async folder => {
+      const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folder}`);
+      const files = await res.json();
+      return { folder, files: Array.isArray(files) ? files : [] };
+    }));
+
+    list.innerHTML = '';
+    let totalCount = 0;
+
+    for (const { folder, files } of results) {
+      const docs = files.filter(f => 
+        (f.name.endsWith('.pdf') || f.name.endsWith('.txt')) && 
+        !f.name.startsWith('.') &&
+        f.name !== 'curious_urls.json'
+      );
+      if (docs.length === 0) continue;
+
+      // Section header
+      const header = document.createElement('li');
+      header.className = 'folder-header';
+      header.textContent = FOLDER_LABELS[folder] || folder;
+      list.appendChild(header);
+
+      for (const doc of docs) {
+        const li = document.createElement('li');
+        li.textContent = formatFileName(doc.name);
+        list.appendChild(li);
+        totalCount++;
+      }
+    }
+
+    // Update heading to show count
+    const heading = document.querySelector('.archive-contents h3');
+    if (heading) heading.textContent = `What's in the Archive (${totalCount} documents)`;
+
+  } catch (e) {
+    list.innerHTML = '<li>Could not load archive contents.</li>';
+    console.error('Archive load error:', e);
+  }
+}
+
+loadArchiveContents();
+
 </script>
 </body>
 </html>
