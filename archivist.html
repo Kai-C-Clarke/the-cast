@@ -45,8 +45,8 @@ body {
 }
 
 #char-avatar {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   object-fit: cover;
   object-position: top;
@@ -245,11 +245,11 @@ body {
 }
 
 .alf-intro img {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+  width: 130px;
+  height: 130px;
+  border-radius: 8px;
   object-fit: cover;
-  object-position: top;
+  object-position: top center;
   border: 2px solid var(--tan);
   filter: sepia(15%);
   flex-shrink: 0;
@@ -307,6 +307,23 @@ body {
   left: 0;
   color: var(--tan);
 }
+
+.disclaimer {
+  margin-top: 16px;
+  background: rgba(122, 59, 30, 0.15);
+  border: 1px solid var(--rust);
+  border-left: 3px solid var(--rust);
+  padding: 12px 16px;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.disclaimer strong {
+  color: var(--rust);
+  font-style: normal;
+}
+
 </style>
 </head>
 <body>
@@ -352,6 +369,14 @@ body {
       <li>Slingsby Sailplanes — Martin Simons</li>
     </ul>
   </div>
+
+  <div class="disclaimer">
+    <strong>Please note:</strong> Alf can provide information from the Archive to assist your research,
+    but it is the responsibility of you or your inspector to verify all procedures, specifications,
+    and requirements against current authoritative sources before carrying out any maintenance work.
+    Nothing Alf says constitutes approved maintenance data or a substitute for professional judgement.
+  </div>
+
 </div>
 
 <div id="chat-container">
