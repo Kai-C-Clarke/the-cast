@@ -524,39 +524,28 @@ function formatFileName(name) {
 async function loadArchiveContents() {
   const list = document.getElementById('archive-list');
   try {
-    // Fetch each folder in parallel
-    const results = await Promise.all(FOLDERS.map(async folder => {
-      const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folder}`);
-      const files = await res.json();
-      return { folder, files: Array.isArray(files) ? files : [] };
-    }));
+    const res = await fetch('/.netlify/functions/archive-contents');
+    const results = await res.json();
 
     list.innerHTML = '';
     let totalCount = 0;
 
-    for (const { folder, files } of results) {
-      const docs = files.filter(f => 
-        (f.name.endsWith('.pdf') || f.name.endsWith('.txt')) && 
-        !f.name.startsWith('.') &&
-        f.name !== 'curious_urls.json'
-      );
-      if (docs.length === 0) continue;
+    for (const { folder, docs } of results) {
+      if (!docs || docs.length === 0) continue;
 
-      // Section header
       const header = document.createElement('li');
       header.className = 'folder-header';
       header.textContent = FOLDER_LABELS[folder] || folder;
       list.appendChild(header);
 
-      for (const doc of docs) {
+      for (const name of docs) {
         const li = document.createElement('li');
-        li.textContent = formatFileName(doc.name);
+        li.textContent = formatFileName(name);
         list.appendChild(li);
         totalCount++;
       }
     }
 
-    // Update heading to show count
     const heading = document.querySelector('.archive-contents h3');
     if (heading) heading.textContent = `What's in the Archive (${totalCount} documents)`;
 
