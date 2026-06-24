@@ -173,25 +173,35 @@ exports.handler = async function(event, context) {
 
     console.log(`[archivist] Query: "${latestQuery.slice(0,80)}" | Docs: ${relevantDocs.map(d=>d.label).join(', ') || 'none'}`);
 
+    const MAX_PDF_BYTES = 4 * 1024 * 1024; // 4MB limit
     const docContent = [];
+    const skippedDocs = [];
+
     for (const doc of relevantDocs) {
       try {
         const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
-        if (meta.download_url) {
-          const rawBuffer = await fetchRawUrl(meta.download_url);
-          if (doc.path.endsWith('.txt')) {
-            docContent.push({
-              type: 'text',
-              text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, 80000)}`
-            });
-          } else {
-            docContent.push({
-              type: 'document',
-              source: { type: 'base64', media_type: 'application/pdf', data: rawBuffer.toString('base64') },
-              title: doc.label,
-              citations: { enabled: true }
-            });
-          }
+        if (!meta.download_url) continue;
+
+        // Check file size before fetching
+        if (meta.size && meta.size > MAX_PDF_BYTES && !doc.path.endsWith('.txt')) {
+          console.log(`[archivist] Skipping ${doc.path} — ${Math.round(meta.size/1024)}KB exceeds limit`);
+          skippedDocs.push(doc.label);
+          continue;
+        }
+
+        const rawBuffer = await fetchRawUrl(meta.download_url);
+        if (doc.path.endsWith('.txt')) {
+          docContent.push({
+            type: 'text',
+            text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, 80000)}`
+          });
+        } else {
+          docContent.push({
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: rawBuffer.toString('base64') },
+            title: doc.label,
+            citations: { enabled: true }
+          });
         }
       } catch (e) {
         console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
@@ -201,7 +211,14 @@ exports.handler = async function(event, context) {
     const userContent = [];
     if (docContent.length > 0) {
       userContent.push(...docContent);
-      userContent.push({ type: 'text', text: `The above document(s) have been retrieved from the Archive as likely relevant.\n\nUser's question: ${latestQuery}` });
+      let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
+      if (skippedDocs.length > 0) {
+        contextNote += `\n\nNote: The following documents were identified as relevant but are too large to load directly (over 4MB): ${skippedDocs.join(', ')}. Answer from your general knowledge of these sources where you can, and note that the user may wish to consult those documents directly.`;
+      }
+      contextNote += `\n\nUser's question: ${latestQuery}`;
+      userContent.push({ type: 'text', text: contextNote });
+    } else if (skippedDocs.length > 0) {
+      userContent.push({ type: 'text', text: `The most relevant documents (${skippedDocs.join(', ')}) are too large to load directly. Answer from your general knowledge of these sources where you can, noting which document the user should consult. User's question: ${latestQuery}` });
     } else {
       userContent.push({ type: 'text', text: latestQuery });
     }
