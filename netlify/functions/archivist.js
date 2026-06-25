@@ -77,8 +77,12 @@ const FILE_INDEX = [
 
   // Adhesives
   { keywords: ['aerodux','resorcinol','500','501','185','hrp','adhesive current','glue current','discontinued'], path: 'adhesives_and_finishing/resorcinol_adhesives_current_position_2026.txt', label: 'Resorcinol Adhesives — Current Position (June 2026)' },
-  { keywords: ['epoxy','west system','105','205','hardener','fairing','filler','microlight','410','pumping'], path: 'adhesives_and_finishing/west_system_user_manual.pdf', label: 'West System User Manual' },
-  { keywords: ['gougeon','epoxy','laminate','boat','layup','vacuum','infusion'], path: 'adhesives_and_finishing/gougeon_brothers_boat_construction.pdf', label: 'Gougeon Brothers on Boat Construction' },
+  { keywords: ['epoxy','west system','105','205','hardener','fairing','filler','microlight','410','pumping','surface prep','clean'], path: 'adhesives_and_finishing/west_system_chapters/03_3_basic_techniques.txt', label: 'West System — Basic Techniques' },
+  { keywords: ['epoxy','west system','products','207','209','additives','filleting','silica','graphite'], path: 'adhesives_and_finishing/west_system_chapters/07_7_the_products.txt', label: 'West System — The Products' },
+  { keywords: ['west system','problem','blush','amine','cure','sticky','soft','fisheye'], path: 'adhesives_and_finishing/west_system_chapters/06_6_problem_solver_problem_possible_causes_solution.txt', label: 'West System — Problem Solver' },
+  { keywords: ['west system','cold','temperature','winter','low temp','bonding temperature'], path: 'adhesives_and_finishing/west_system_chapters/04_4_cold_temperature_bonding.txt', label: 'West System — Cold Temperature Bonding' },
+  { keywords: ['gougeon','epoxy','laminate','layup','vacuum','infusion','wood epoxy','saturation'], path: 'adhesives_and_finishing/gougeon_chapters/part_01.txt', label: 'Gougeon Brothers — Part 1' },
+  { keywords: ['gougeon','epoxy','scarfing','bonding','laminating','cold moulding'], path: 'adhesives_and_finishing/gougeon_chapters/part_02.txt', label: 'Gougeon Brothers — Part 2' },
 
   // Composite
   { keywords: ['grp','fibreglass','fiberglass','glass','resin','polyester','gel coat','flickfibel','gfk','plastic'], path: 'composite_repair/plastic_plane_patch_primer_flickfibel_1978.pdf', label: 'Flickfibel 1978 — GRP Repair (Ursula Hänle)' },
@@ -101,19 +105,25 @@ const FILE_INDEX = [
 
   // BGA CA Exposition and Course
   { keywords: ['exposition','bga cae','part h','non-part 21','arc','airworthiness certificate','bga 267','gmp','sdmp','permit'], path: 'general_airworthiness/BGA-CA-Exposition-Iss-1-Master-Mar-2021.pdf', label: 'BGA CAE Exposition March 2021' },
-  { keywords: ['engineering','course','inspector','levelling','weighing','balance','stress','load','fatigue','hoy','basic engineering'], path: 'general_airworthiness/Complete Volume Engineering Course Notes Iss 2.pdf', label: 'Engineering Course Notes (Hoy, Iss 2)' },
+  { keywords: ['engineering','course','inspector','hoy','basic engineering','chapter 1','general items'], path: 'general_airworthiness/hoy_engineering_chapters/01_chapter_1.txt', label: 'Hoy Engineering Course — Chapter 1 (General)' },
+  { keywords: ['hoy','stress','load','strength','fatigue','chapter 2','forces'], path: 'general_airworthiness/hoy_engineering_chapters/02_chapter_2.txt', label: 'Hoy Engineering Course — Chapter 2' },
+  { keywords: ['hoy','weighing','balance','levelling','centre of gravity','chapter 3','weight'], path: 'general_airworthiness/hoy_engineering_chapters/08_chapter_3.txt', label: 'Hoy Engineering Course — Chapter 3 (Weighing)' },
 
   // Wood construction
   { keywords: ['werkstattpraxis','jacobs','1935','german','workshop','construction','baupraxis'], path: 'wood_construction/werkstattpraxis_1935_english_COMPLETE.txt', label: 'Jacobs Werkstattpraxis 1935 (English translation)' },
-  { keywords: ['stafford','allen','1959','glider','maintenance','rib','spar','repair vintage'], path: 'wood_construction/stafford_allen_glider_maintenance_1959.pdf', label: 'Stafford Allen — Glider Maintenance 1959' },
-  { keywords: ['ac43','faa','wood structure','aircraft wood','federal aviation'], path: 'wood_construction/ac43_13_1b_chapter1_wood_structures.pdf', label: 'AC43.13-1B Chapter 1 — Wood Structures' },
+  { keywords: ['stafford','allen','1959','timber','ply','repair','scarf','glue','aerolite','ribs','spar'], path: 'wood_construction/stafford_allen_chapters/03_3_timber_and_ply_repairs_glues.txt', label: 'Stafford Allen — Timber and Ply Repairs, Glues' },
+  { keywords: ['stafford','allen','maintenance','inspection','general','annual'], path: 'wood_construction/stafford_allen_chapters/02_1_maintenance.txt', label: 'Stafford Allen — Maintenance (General)' },
+  { keywords: ['stafford','allen','fabric','dope','covering','finish'], path: 'wood_construction/stafford_allen_chapters/06_6_fabric_and_dope.txt', label: 'Stafford Allen — Fabric and Dope' },
+  { keywords: ['stafford','allen','metal','repair','fitting','steel'], path: 'wood_construction/stafford_allen_chapters/04_4_metal_repairs.txt', label: 'Stafford Allen — Metal Repairs' },
+  { keywords: ['ac43','faa','wood structure','aircraft wood','federal aviation','timber','spruce','spar repair'], path: 'wood_construction/ac43_chapters/14_chapter_1_wood_structure.txt', label: 'AC43.13-1B — Wood Structure (full chapter)' },
+  { keywords: ['ac43','fabric','covering','dope','polyester','ceconite','rib stitch'], path: 'wood_construction/ac43_chapters/02_chapter_2_fabric_covering.txt', label: 'AC43.13-1B — Fabric Covering' },
   { keywords: ['anc18','anc-18','design wood','aircraft structure design'], path: 'wood_construction/anc18_design_wood_aircraft_structures.pdf', label: 'ANC-18 — Design of Wood Aircraft Structures' },
   { keywords: ['anc19','anc-19','inspection fabrication','wood inspection'], path: 'wood_construction/anc19_wood_aircraft_inspection_fabrication.pdf', label: 'ANC-19 — Wood Aircraft Inspection and Fabrication' },
 
   // History and literature
-  { keywords: ['kronfeld','soaring','thermal','history','wave','ridge'], path: 'gliding_history_and_literature/kronfeld_on_gliding_and_soaring.pdf', label: 'Kronfeld — On Gliding and Soaring' },
-  { keywords: ['wally','kahn','bold','history','vintage pilot'], path: 'gliding_history_and_literature/wally_kahn_a_glider_pilot_bold.pdf', label: 'Wally Kahn — A Glider Pilot Bold' },
-  { keywords: ['ann','welch','silent','flight','1939','pre-war'], path: 'gliding_history_and_literature/silent_flight_ann_welch_1939.pdf', label: 'Ann Welch — Silent Flight (1939)' },
+  { keywords: ['kronfeld','soaring','thermal','history','wave','ridge','gliding'], path: 'gliding_history_and_literature/kronfeld_chapters/part_01.txt', label: 'Kronfeld — On Gliding and Soaring (Part 1)' },
+  { keywords: ['wally','kahn','bold','history','vintage pilot'], path: 'gliding_history_and_literature/wally_kahn_chapters/part_01.txt', label: 'Wally Kahn — A Glider Pilot Bold (Part 1)' },
+  { keywords: ['ann','welch','silent','flight','1939','pre-war'], path: 'gliding_history_and_literature/ann_welch_chapters/part_01.txt', label: 'Ann Welch — Silent Flight (1939)' },
   { keywords: ['slingsby','martin','simons','sailplane','type history','t21','t49'], path: 'gliding_history_and_literature/slingsby_sailplanes_martin_simons.pdf', label: 'Martin Simons — Slingsby Sailplanes' },
 ];
 
