@@ -67,13 +67,13 @@ function fetchRawUrl(url) {
 
 const FILE_INDEX = [
   // BGA Standard Repairs
-  { keywords: ['wood','timber','ply','plywood','spruce','spar','stringer','grain','moisture','scarf','joint','aerodux','resorcinol','casein','repair','section 3'], path: 'BGA_Standard_Repairs/section3.pdf', label: 'BGA Standard Repairs — Section 3 (Wood Repairs)' },
-  { keywords: ['fabric','dope','ceconite','polyester','covering','rib stitch','tautening','section 4','repair fabric','fabric repair','wing panel','damaged fabric','patch','cellulose dope','butyrate dope','recover'], path: 'BGA_Standard_Repairs/section4.pdf', label: 'BGA Standard Repairs — Section 4 (Fabric)' },
-  { keywords: ['metal','steel','aluminium','aluminum','rivet','section 2'], path: 'BGA_Standard_Repairs/section2.pdf', label: 'BGA Standard Repairs — Section 2 (Metal)' },
-  { keywords: ['standard repairs','foreword','general','introduction','bga repairs'], path: 'BGA_Standard_Repairs/foreword.pdf', label: 'BGA Standard Repairs — Foreword' },
-  { keywords: ['standard repairs','section 1'], path: 'BGA_Standard_Repairs/section1.pdf', label: 'BGA Standard Repairs — Section 1' },
-  { keywords: ['standard repairs','section 5'], path: 'BGA_Standard_Repairs/section5.pdf', label: 'BGA Standard Repairs — Section 5' },
-  { keywords: ['standard repairs','section 6'], path: 'BGA_Standard_Repairs/section6.pdf', label: 'BGA Standard Repairs — Section 6' },
+  { keywords: ['wood','timber','ply','plywood','spruce','spar','stringer','grain','moisture','scarf','joint','aerodux','resorcinol','casein','repair','section 3'], path: 'BGA_Standard_Repairs/section3_text.txt', label: 'BGA Standard Repairs — Section 3 (Wood Repairs)' },
+  { keywords: ['fabric','dope','ceconite','polyester','covering','rib stitch','tautening','section 4','repair fabric','fabric repair','wing panel','damaged fabric','patch','cellulose dope','butyrate dope','recover'], path: 'BGA_Standard_Repairs/section4_text.txt', label: 'BGA Standard Repairs — Section 4 (Fabric)' },
+  { keywords: ['metal','steel','aluminium','aluminum','rivet','section 2'], path: 'BGA_Standard_Repairs/section2_text.txt', label: 'BGA Standard Repairs — Section 2 (Metal)' },
+  { keywords: ['standard repairs','foreword','general','introduction','bga repairs'], path: 'BGA_Standard_Repairs/foreword_text.txt', label: 'BGA Standard Repairs — Foreword' },
+  { keywords: ['standard repairs','section 1'], path: 'BGA_Standard_Repairs/section1_text.txt', label: 'BGA Standard Repairs — Section 1' },
+  { keywords: ['standard repairs','section 5'], path: 'BGA_Standard_Repairs/section5_text.txt', label: 'BGA Standard Repairs — Section 5' },
+  { keywords: ['standard repairs','section 6'], path: 'BGA_Standard_Repairs/section6_text.txt', label: 'BGA Standard Repairs — Section 6' },
 
   // Adhesives
   { keywords: ['aerodux','resorcinol','500','501','185','hrp','adhesive current','glue current','discontinued'], path: 'adhesives_and_finishing/resorcinol_adhesives_current_position_2026.txt', label: 'Resorcinol Adhesives — Current Position (June 2026)' },
@@ -85,28 +85,28 @@ const FILE_INDEX = [
   { keywords: ['gougeon','epoxy','scarfing','bonding','laminating','cold moulding'], path: 'adhesives_and_finishing/gougeon_chapters/part_02.txt', label: 'Gougeon Brothers — Part 2' },
 
   // Composite
-  { keywords: ['grp','fibreglass','fiberglass','glass','resin','polyester','gel coat','flickfibel','gfk','plastic'], path: 'composite_repair/plastic_plane_patch_primer_flickfibel_1978.pdf', label: 'Flickfibel 1978 — GRP Repair (Ursula Hänle)' },
+  { keywords: ['grp','fibreglass','fiberglass','glass','resin','polyester','gel coat','flickfibel','gfk','plastic'], path: 'composite_repair/flickfibel_text.txt', label: 'Flickfibel 1978 — GRP Repair (Ursula Hänle)' },
 
   // Fabric
-  { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink','repair','patch','panel','wing fabric','fuselage fabric','cellulose','damaged'], path: 'fabric_covering/ceconite_manual_101.pdf', label: 'Ceconite Manual 101' },
+  { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink','repair','patch','panel','wing fabric','fuselage fabric','cellulose','damaged'], path: 'fabric_covering/ceconite_manual_101_text.txt', label: 'Ceconite Manual 101' },
   { keywords: ['diatex','nitrate','butyrate','polyester','covering','form 205','recovering','fabric procedure','non-tautening','tautening','solo','cellulose','aluminium dope','topcoat','finish','repair','patch','panel','wing panel','ceconite repair'], path: 'fabric_covering/polyester_fabric_covering_reference_note_2026.txt', label: 'Polyester Fabric Covering — Reference Note (2026)' },
 
   // BGA Compendium — General
-  { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information.pdf', label: 'BGA Compendium — General Information' },
-  { keywords: ['compendium','foreword','instructions','how to use','compendium introduction'], path: 'general_airworthiness/BGA-Compendium-Foreword-and-Instructions.pdf', label: 'BGA Compendium — Foreword and Instructions' },
+  { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information_text.txt', label: 'BGA Compendium — General Information' },
+  { keywords: ['compendium','foreword','instructions','how to use','compendium introduction'], path: 'general_airworthiness/BGA-Compendium-Foreword_text.txt', label: 'BGA Compendium — Foreword and Instructions' },
   { keywords: ['form 205','205','task worksheet','bga 205','worksheet','release to service','certificate','tools clearance','access panels','ml.a.801','part 21','annex ii','non-part 21','pilot owner','rectification','sign off','signing off'], path: 'general_airworthiness/BGA-205-Task-Worksheet-reference-note-2026.txt', label: 'BGA Form 205 — Task Worksheet Reference Note (May 2026)' },
-  { keywords: ['special inspection','mandatory inspection','compendium special'], path: 'general_airworthiness/BGA-Compendium-Special-Inspections.pdf', label: 'BGA Compendium — Special Inspections' },
-  { keywords: ['weighing','weight','balance','periodicity','reweigh'], path: 'general_airworthiness/BGA-Aircraft-Weighing-Periodicity-2020.pdf', label: 'BGA Aircraft Weighing Periodicity (2020)' },
-  { keywords: ['equipment','instrument','hook','tost','release','altimeter','variometer','radio','transponder'], path: 'general_airworthiness/BGA-Compendium-Equipment.pdf', label: 'BGA Compendium — Equipment' },
+  { keywords: ['special inspection','mandatory inspection','compendium special'], path: 'general_airworthiness/BGA-Compendium-Special-Inspections_text.txt', label: 'BGA Compendium — Special Inspections' },
+  { keywords: ['weighing','weight','balance','periodicity','reweigh'], path: 'general_airworthiness/BGA-Aircraft-Weighing-Periodicity_text.txt', label: 'BGA Aircraft Weighing Periodicity (2020)' },
+  { keywords: ['equipment','instrument','hook','tost','release','altimeter','variometer','radio','transponder'], path: 'general_airworthiness/BGA-Compendium-Equipment_text.txt', label: 'BGA Compendium — Equipment' },
 
   // BGA Compendium — Type specific
-  { keywords: ['schleicher','ka-6','ka6','k-8','k8','k-13','k13','ask','ka2','ka8','wood schleicher'], path: 'general_airworthiness/BGA-Compendium-Schleicher-Wood.pdf', label: 'BGA Compendium — Schleicher Wood Types' },
-  { keywords: ['schempp','hirth','shk','cirrus','standard cirrus','nimbus','duo discus','discus','ventus','janus'], path: 'general_airworthiness/BGA-Compendium-Schempp-Hirth.pdf', label: 'BGA Compendium — Schempp-Hirth' },
-  { keywords: ['slingsby','prefect','tutor','swallow','skylark','capstan','kite','petrel','dart','t21','t38','t49','t51'], path: 'general_airworthiness/BGA-Compendium-Slingsby.pdf', label: 'BGA Compendium — Slingsby' },
-  { keywords: ['elliots','olympia','eon','olympia 2b','olympia 460','eon olympia'], path: 'general_airworthiness/BGA-Compendium-Elliots.pdf', label: 'BGA Compendium — Elliots (Olympia)' },
+  { keywords: ['schleicher','ka-6','ka6','k-8','k8','k-13','k13','ask','ka2','ka8','wood schleicher'], path: 'general_airworthiness/BGA-Compendium-Schleicher-Wood_text.txt', label: 'BGA Compendium — Schleicher Wood Types' },
+  { keywords: ['schempp','hirth','shk','cirrus','standard cirrus','nimbus','duo discus','discus','ventus','janus'], path: 'general_airworthiness/BGA-Compendium-Schempp-Hirth_text.txt', label: 'BGA Compendium — Schempp-Hirth' },
+  { keywords: ['slingsby','prefect','tutor','swallow','skylark','capstan','kite','petrel','dart','t21','t38','t49','t51'], path: 'general_airworthiness/BGA-Compendium-Slingsby_text.txt', label: 'BGA Compendium — Slingsby' },
+  { keywords: ['elliots','olympia','eon','olympia 2b','olympia 460','eon olympia'], path: 'general_airworthiness/BGA-Compendium-Elliots_text.txt', label: 'BGA Compendium — Elliots (Olympia)' },
 
   // BGA CA Exposition and Course
-  { keywords: ['exposition','bga cae','part h','non-part 21','arc','airworthiness certificate','bga 267','gmp','sdmp','permit'], path: 'general_airworthiness/BGA-CA-Exposition-Iss-1-Master-Mar-2021.pdf', label: 'BGA CAE Exposition March 2021' },
+  { keywords: ['exposition','bga cae','part h','non-part 21','arc','airworthiness certificate','bga 267','gmp','sdmp','permit'], path: 'general_airworthiness/BGA-CA-Exposition_text.txt', label: 'BGA CAE Exposition March 2021' },
   { keywords: ['engineering','course','inspector','hoy','basic engineering','chapter 1','general items'], path: 'general_airworthiness/hoy_engineering_chapters/01_chapter_1.txt', label: 'Hoy Engineering Course — Chapter 1 (General)' },
   { keywords: ['hoy','stress','load','strength','fatigue','chapter 2','forces'], path: 'general_airworthiness/hoy_engineering_chapters/02_chapter_2.txt', label: 'Hoy Engineering Course — Chapter 2' },
   { keywords: ['hoy','weighing','balance','levelling','centre of gravity','chapter 3','weight'], path: 'general_airworthiness/hoy_engineering_chapters/08_chapter_3.txt', label: 'Hoy Engineering Course — Chapter 3 (Weighing)' },
@@ -185,7 +185,6 @@ exports.handler = async function(event, context) {
 
     console.log(`[archivist] Query: "${latestQuery.slice(0,80)}" | Docs: ${relevantDocs.map(d=>d.label).join(', ') || 'none'}`);
 
-    const MAX_PDF_BYTES = 4 * 1024 * 1024; // 4MB limit
     const docContent = [];
     const skippedDocs = [];
 
@@ -194,27 +193,11 @@ exports.handler = async function(event, context) {
         const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
         if (!meta.download_url) continue;
 
-        // Check file size before fetching
-        if (meta.size && meta.size > MAX_PDF_BYTES && !doc.path.endsWith('.txt')) {
-          console.log(`[archivist] Skipping ${doc.path} — ${Math.round(meta.size/1024)}KB exceeds limit`);
-          skippedDocs.push(doc.label);
-          continue;
-        }
-
         const rawBuffer = await fetchRawUrl(meta.download_url);
-        if (doc.path.endsWith('.txt')) {
-          docContent.push({
-            type: 'text',
-            text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, 80000)}`
-          });
-        } else {
-          docContent.push({
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: rawBuffer.toString('base64') },
-            title: doc.label,
-            citations: { enabled: true }
-          });
-        }
+        docContent.push({
+          type: 'text',
+          text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, 80000)}`
+        });
       } catch (e) {
         console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
       }
