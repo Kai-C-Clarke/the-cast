@@ -45,6 +45,30 @@ function githubGet(path) {
   });
 }
 
+async function getFolderDocs(folder) {
+  const items = await githubGet(folder);
+  if (!Array.isArray(items)) return [];
+
+  const docs = [];
+  for (const item of items) {
+    if (item.type === 'file' && (item.name.endsWith('.pdf') || item.name.endsWith('.txt') || item.name.endsWith('.doc')) && !item.name.startsWith('.')) {
+      docs.push(item.name);
+    } else if (item.type === 'dir') {
+      // One level of recursion for subfolders
+      try {
+        const subItems = await githubGet(`${folder}/${item.name}`);
+        if (Array.isArray(subItems)) {
+          const subDocs = subItems
+            .filter(f => f.type === 'file' && (f.name.endsWith('.pdf') || f.name.endsWith('.txt') || f.name.endsWith('.doc')) && !f.name.startsWith('.'))
+            .map(f => `${item.name}/${f.name}`);
+          docs.push(...subDocs);
+        }
+      } catch (e) {}
+    }
+  }
+  return docs;
+}
+
 exports.handler = async function(event, context) {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: '' };
@@ -53,13 +77,8 @@ exports.handler = async function(event, context) {
   try {
     const results = [];
     for (const folder of FOLDERS) {
-      const files = await githubGet(folder);
-      if (Array.isArray(files)) {
-        const docs = files
-          .filter(f => (f.name.endsWith('.pdf') || f.name.endsWith('.txt')) && !f.name.startsWith('.'))
-          .map(f => f.name);
-        results.push({ folder, docs });
-      }
+      const docs = await getFolderDocs(folder);
+      results.push({ folder, docs });
     }
     return {
       statusCode: 200,
