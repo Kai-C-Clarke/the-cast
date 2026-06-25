@@ -224,7 +224,7 @@ exports.handler = async function(event, context) {
 
     const response = await anthropicPost({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: ARCHIVIST_SYSTEM,
       messages: allMessages
     });
