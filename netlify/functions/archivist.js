@@ -89,6 +89,7 @@ const FILE_INDEX = [
 
   // Fabric
   { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink'], path: 'fabric_covering/ceconite_manual_101.pdf', label: 'Ceconite Manual 101' },
+  { keywords: ['diatex','nitrate','butyrate','polyester','covering','form 205','recovering','fabric procedure','non-tautening','tautening','solo','cellulose','aluminium dope','topcoat','finish'], path: 'fabric_covering/polyester_fabric_covering_reference_note_2026.txt', label: 'Polyester Fabric Covering — Reference Note (2026)' },
 
   // BGA Compendium — General
   { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information.pdf', label: 'BGA Compendium — General Information' },
