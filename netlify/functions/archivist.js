@@ -94,6 +94,7 @@ const FILE_INDEX = [
   // BGA Compendium — General
   { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information.pdf', label: 'BGA Compendium — General Information' },
   { keywords: ['compendium','foreword','instructions','how to use','compendium introduction'], path: 'general_airworthiness/BGA-Compendium-Foreword-and-Instructions.pdf', label: 'BGA Compendium — Foreword and Instructions' },
+  { keywords: ['form 205','205','task worksheet','bga 205','worksheet','release to service','certificate','tools clearance','access panels','ml.a.801','part 21','annex ii','non-part 21','pilot owner','rectification','sign off','signing off'], path: 'general_airworthiness/BGA-205-Task-Worksheet-reference-note-2026.txt', label: 'BGA Form 205 — Task Worksheet Reference Note (May 2026)' },
   { keywords: ['special inspection','mandatory inspection','compendium special'], path: 'general_airworthiness/BGA-Compendium-Special-Inspections.pdf', label: 'BGA Compendium — Special Inspections' },
   { keywords: ['weighing','weight','balance','periodicity','reweigh'], path: 'general_airworthiness/BGA-Aircraft-Weighing-Periodicity-2020.pdf', label: 'BGA Aircraft Weighing Periodicity (2020)' },
   { keywords: ['equipment','instrument','hook','tost','release','altimeter','variometer','radio','transponder'], path: 'general_airworthiness/BGA-Compendium-Equipment.pdf', label: 'BGA Compendium — Equipment' },
