@@ -109,7 +109,7 @@ const FILE_INDEX = [
   { keywords: ['elliots','olympia','eon','olympia 2b','olympia 460','eon olympia'], path: 'general_airworthiness/BGA-Compendium-Elliots_text.txt', label: 'BGA Compendium — Elliots (Olympia)' },
 
   // BGA CA Exposition and Course
-  { keywords: ['exposition','bga cae','part h','non-part 21','arc','airworthiness certificate','bga 267','gmp','sdmp','permit'], path: 'general_airworthiness/BGA-CA-Exposition_text.txt', label: 'BGA CAE Exposition March 2021' },
+  { keywords: ['exposition','bga cae','part h','non-part 21','arc','airworthiness certificate','bga 267','gmp','sdmp','permit','calibration','test equipment','torque','torque wrench','manometer','pitot static','weighing scales','ukas','tool calibration','instrument calibration','altimeter calibration','asi calibration','airspeed calibration','measuring equipment'], path: 'general_airworthiness/BGA-CA-Exposition_text.txt', label: 'BGA CAE Exposition March 2021' },
   { keywords: ['engineering','course','inspector','hoy','basic engineering','chapter 1','general items'], path: 'general_airworthiness/hoy_engineering_chapters/01_chapter_1.txt', label: 'Hoy Engineering Course — Chapter 1 (General)' },
   { keywords: ['hoy','stress','load','strength','fatigue','chapter 2','forces'], path: 'general_airworthiness/hoy_engineering_chapters/02_chapter_2.txt', label: 'Hoy Engineering Course — Chapter 2' },
   { keywords: ['hoy','weighing','balance','levelling','centre of gravity','chapter 3','weight'], path: 'general_airworthiness/hoy_engineering_chapters/08_chapter_3.txt', label: 'Hoy Engineering Course — Chapter 3 (Weighing)' },
