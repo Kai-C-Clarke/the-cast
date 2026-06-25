@@ -68,7 +68,7 @@ function fetchRawUrl(url) {
 const FILE_INDEX = [
   // BGA Standard Repairs
   { keywords: ['wood','timber','ply','plywood','spruce','spar','stringer','grain','moisture','scarf','joint','aerodux','resorcinol','casein','repair','section 3'], path: 'BGA_Standard_Repairs/section3.pdf', label: 'BGA Standard Repairs — Section 3 (Wood Repairs)' },
-  { keywords: ['fabric','dope','ceconite','polyester','covering','rib stitch','tautening','section 4'], path: 'BGA_Standard_Repairs/section4.pdf', label: 'BGA Standard Repairs — Section 4 (Fabric)' },
+  { keywords: ['fabric','dope','ceconite','polyester','covering','rib stitch','tautening','section 4','repair fabric','fabric repair','wing panel','damaged fabric','patch','cellulose dope','butyrate dope','recover'], path: 'BGA_Standard_Repairs/section4.pdf', label: 'BGA Standard Repairs — Section 4 (Fabric)' },
   { keywords: ['metal','steel','aluminium','aluminum','rivet','section 2'], path: 'BGA_Standard_Repairs/section2.pdf', label: 'BGA Standard Repairs — Section 2 (Metal)' },
   { keywords: ['standard repairs','foreword','general','introduction','bga repairs'], path: 'BGA_Standard_Repairs/foreword.pdf', label: 'BGA Standard Repairs — Foreword' },
   { keywords: ['standard repairs','section 1'], path: 'BGA_Standard_Repairs/section1.pdf', label: 'BGA Standard Repairs — Section 1' },
@@ -88,8 +88,8 @@ const FILE_INDEX = [
   { keywords: ['grp','fibreglass','fiberglass','glass','resin','polyester','gel coat','flickfibel','gfk','plastic'], path: 'composite_repair/plastic_plane_patch_primer_flickfibel_1978.pdf', label: 'Flickfibel 1978 — GRP Repair (Ursula Hänle)' },
 
   // Fabric
-  { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink'], path: 'fabric_covering/ceconite_manual_101.pdf', label: 'Ceconite Manual 101' },
-  { keywords: ['diatex','nitrate','butyrate','polyester','covering','form 205','recovering','fabric procedure','non-tautening','tautening','solo','cellulose','aluminium dope','topcoat','finish'], path: 'fabric_covering/polyester_fabric_covering_reference_note_2026.txt', label: 'Polyester Fabric Covering — Reference Note (2026)' },
+  { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink','repair','patch','panel','wing fabric','fuselage fabric','cellulose','damaged'], path: 'fabric_covering/ceconite_manual_101.pdf', label: 'Ceconite Manual 101' },
+  { keywords: ['diatex','nitrate','butyrate','polyester','covering','form 205','recovering','fabric procedure','non-tautening','tautening','solo','cellulose','aluminium dope','topcoat','finish','repair','patch','panel','wing panel','ceconite repair'], path: 'fabric_covering/polyester_fabric_covering_reference_note_2026.txt', label: 'Polyester Fabric Covering — Reference Note (2026)' },
 
   // BGA Compendium — General
   { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information.pdf', label: 'BGA Compendium — General Information' },
