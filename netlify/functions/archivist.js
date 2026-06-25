@@ -90,6 +90,7 @@ const FILE_INDEX = [
   // Fabric
   { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink','repair','patch','panel','wing fabric','fuselage fabric','cellulose','damaged'], path: 'fabric_covering/ceconite_manual_101_text.txt', label: 'Ceconite Manual 101' },
   { keywords: ['diatex','nitrate','butyrate','polyester','covering','form 205','recovering','fabric procedure','non-tautening','tautening','solo','cellulose','aluminium dope','topcoat','finish','repair','patch','panel','wing panel','ceconite repair'], path: 'fabric_covering/polyester_fabric_covering_reference_note_2026.txt', label: 'Polyester Fabric Covering — Reference Note (2026)' },
+  { keywords: ['overlap','patch overlap','3 inch','2 inch','unsupported','supported','repair patch','inter-rib','fabric repair','hole repair','ceconite repair','appendix e','new super seam','pinking shears'], path: 'fabric_covering/fabric_repair_patch_overlap_note_2026.txt', label: 'Fabric Repair Patch Overlap — Ceconite + BGA Practice (2026)' },
 
   // BGA Compendium — General
   { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information_text.txt', label: 'BGA Compendium — General Information' },
