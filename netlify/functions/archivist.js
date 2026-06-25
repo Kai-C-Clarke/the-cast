@@ -128,6 +128,29 @@ const FILE_INDEX = [
   { keywords: ['wally','kahn','bold','history','vintage pilot'], path: 'gliding_history_and_literature/wally_kahn_chapters/part_01.txt', label: 'Wally Kahn — A Glider Pilot Bold (Part 1)' },
   { keywords: ['ann','welch','silent','flight','1939','pre-war'], path: 'gliding_history_and_literature/ann_welch_chapters/part_01.txt', label: 'Ann Welch — Silent Flight (1939)' },
   { keywords: ['slingsby','martin','simons','sailplane','type history','t21','t49'], path: 'gliding_history_and_literature/slingsby_sailplanes_martin_simons.pdf', label: 'Martin Simons — Slingsby Sailplanes' },
+
+  // AMP Manual
+  { keywords: ['arc','arc renewal','part 21','certificate of airworthiness renewal','annual'], path: 'general_airworthiness/AMP/amp_1-1_arc_renewal_part_21.txt', label: 'AMP 1-1 — ARC Renewal (Part 21)' },
+  { keywords: ['inspector','authorisation','ratings','inspector rating','bga inspector','qualification'], path: 'general_airworthiness/AMP/amp_1-2_inspector_authorisation_and_ratings.txt', label: 'AMP 1-2 — Inspector Authorisation and Ratings' },
+  { keywords: ['logbook','aircraft logbook','log book','records','documentation'], path: 'general_airworthiness/AMP/amp_1-3_aircraft_logbooks.txt', label: 'AMP 1-3 — Aircraft Logbooks' },
+  { keywords: ['duplicate inspection','independent inspection','critical task','duplicate','second signature'], path: 'general_airworthiness/AMP/amp_1-4_independent_duplicate_inspections.txt', label: 'AMP 1-4 — Independent / Duplicate Inspections' },
+  { keywords: ['harness','seat belt','belt','lap strap','shoulder harness'], path: 'general_airworthiness/AMP/amp_1-5_seat_harnesses_and_belts.txt', label: 'AMP 1-5 — Seat Harnesses and Belts' },
+  { keywords: ['transponder','squawk','mode c','mode s','ssr','ads-b'], path: 'general_airworthiness/AMP/amp_1-7_transponder_maintenance.txt', label: 'AMP 1-7 — Transponder Maintenance' },
+  { keywords: ['trailer','trailer maintenance','road trailer','transport'], path: 'general_airworthiness/AMP/amp_1-8_trailer_maintenance.txt', label: 'AMP 1-8 — Trailer Maintenance' },
+  { keywords: ['weighing','weight','balance','centre of gravity','cg','mass balance'], path: 'general_airworthiness/AMP/amp_1-9_glider_weighing.txt', label: 'AMP 1-9 — Glider Weighing' },
+  { keywords: ['battery','battery maintenance','lead acid','lithium','12v','electrolyte'], path: 'general_airworthiness/AMP/amp_1-11_battery_maintenance.txt', label: 'AMP 1-11 — Battery Maintenance' },
+  { keywords: ['complex maintenance','complex repair','major repair'], path: 'general_airworthiness/AMP/amp_1-12_complex_maintenance.txt', label: 'AMP 1-12 — Complex Maintenance' },
+  { keywords: ['sdmp','self declared','maintenance programme','self declared maintenance'], path: 'general_airworthiness/AMP/amp_1-14_self_declared_maintenance_programme.txt', label: 'AMP 1-14 — Self Declared Maintenance Programme' },
+  { keywords: ['materials','parts','acceptable materials','approved parts','hardware','components'], path: 'general_airworthiness/AMP/amp_1-15_acceptable_materials_and_parts.txt', label: 'AMP 1-15 — Acceptable Materials and Parts' },
+  { keywords: ['a conditions','permit flight','a condition','flight condition','permit to fly'], path: 'general_airworthiness/AMP/amp_2-1_a_conditions_flight.txt', label: 'AMP 2-1 — A Conditions Flight' },
+  { keywords: ['c of a','coa','bga certificate','certificate of airworthiness','non part 21','renewal'], path: 'general_airworthiness/AMP/amp_2-2_bga_c_of_a_renewal.txt', label: 'AMP 2-2 — BGA C of A Renewal' },
+  { keywords: ['modification','mod','non part 21','modify glider','alteration'], path: 'general_airworthiness/AMP/amp_2-3_modification_of_non-part_21_gliders.txt', label: 'AMP 2-3 — Modification of Non-Part 21 Gliders' },
+  { keywords: ['narc','national arc','national airworthiness review','narc renewal'], path: 'general_airworthiness/AMP/amp_2-4_narc_renewal.txt', label: 'AMP 2-4 — NARC Renewal' },
+  { keywords: ['certifying','bga glider','certify','non part 21','new glider'], path: 'general_airworthiness/AMP/amp_2-5_certifying_a_bga_glider.txt', label: 'AMP 2-5 — Certifying a BGA Glider' },
+  { keywords: ['control cable','flying control','cable','turnbuckle','nicopress','cable tension'], path: 'general_airworthiness/AMP/flying_control_cables.txt', label: 'AMP — Flying Control Cables' },
+  { keywords: ['motor glider','engine','rotax','power plant','motorglider','engine inspection'], path: 'general_airworthiness/AMP/motor_glider_engine_inspection.txt', label: 'AMP — Motor Glider Engine Inspection and Repair' },
+  { keywords: ['instrument','altimeter','variometer','airspeed','calibration','instrument repair','asi','pitot'], path: 'general_airworthiness/AMP/standard_repairs_5_instrument_repairs.txt', label: 'BGA Standard Repairs — Section 5 (Instrument Repairs)' },
+  { keywords: ['weighing','weight schedule','mass balance','ballast','weighing record'], path: 'general_airworthiness/AMP/standard_repairs_6_weighing.txt', label: 'BGA Standard Repairs — Section 6 (Weighing)' },
 ];
 
 function selectDocuments(query) {
