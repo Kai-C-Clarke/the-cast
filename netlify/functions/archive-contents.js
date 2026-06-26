@@ -51,7 +51,7 @@ async function getFolderDocs(folder) {
 
   const docs = [];
   for (const item of items) {
-    if (item.type === 'file' && (item.name.endsWith('.pdf') || item.name.endsWith('.txt') || item.name.endsWith('.doc')) && !item.name.startsWith('.')) {
+    if (item.type === 'file' && (item.name.endsWith('.txt') || item.name.endsWith('.doc')) && !item.name.startsWith('.')) {
       docs.push(item.name);
     } else if (item.type === 'dir') {
       // One level of recursion for subfolders
@@ -59,7 +59,7 @@ async function getFolderDocs(folder) {
         const subItems = await githubGet(`${folder}/${item.name}`);
         if (Array.isArray(subItems)) {
           const subDocs = subItems
-            .filter(f => f.type === 'file' && (f.name.endsWith('.pdf') || f.name.endsWith('.txt') || f.name.endsWith('.doc')) && !f.name.startsWith('.'))
+            .filter(f => f.type === 'file' && (f.name.endsWith('.txt') || f.name.endsWith('.doc')) && !f.name.startsWith('.'))
             .map(f => `${item.name}/${f.name}`);
           docs.push(...subDocs);
         }
