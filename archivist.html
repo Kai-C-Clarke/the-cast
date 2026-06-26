@@ -503,18 +503,18 @@ function addMessage(role, text, sources) {
     waBtn.href = `https://wa.me/?text=${waText}`;
     actions.appendChild(waBtn);
 
-    // Email
+    // Gmail
     const emailBtn = document.createElement('a');
     emailBtn.className = 'action-btn';
-    emailBtn.innerHTML = '@ Email';
+    emailBtn.innerHTML = '@ Gmail';
     emailBtn.target = '_blank';
-    const srcText = sources && sources.length ? '\nSources: ' + sources.join(', ') : '';
-    const emailBody = encodeURIComponent(
+    const srcText2 = sources && sources.length ? '\nSources: ' + sources.join(', ') : '';
+    const gmailBody = encodeURIComponent(
       'From Alf Kirby — The Glider Workshop Archive:\n\n' +
-      text + srcText +
+      text + srcText2 +
       '\n\nhttps://thecast.chat/archivist.html'
     );
-    emailBtn.href = `mailto:?subject=Alf Kirby — Glider Workshop Archive&body=${emailBody}`;
+    emailBtn.href = `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent('Alf Kirby — Glider Workshop Archive')}&body=${gmailBody}`;
     actions.appendChild(emailBtn);
 
     div.appendChild(actions);
