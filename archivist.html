@@ -137,12 +137,50 @@ body {
 }
 
 .message.assistant .source-line {
-  margin-top: 10px;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  font-style: italic;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--worn);
+  font-style: normal;
+  font-weight: 500;
   border-top: 1px solid var(--paper-dark);
-  padding-top: 6px;
+  padding-top: 8px;
+  line-height: 1.6;
+}
+.message.assistant .source-line a {
+  color: var(--tan);
+  text-decoration: underline;
+  text-decoration-color: rgba(196,154,60,0.4);
+  text-underline-offset: 2px;
+}
+.message.assistant .source-line a:hover {
+  color: var(--tan-light);
+}
+.message-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  background: var(--paper-dark);
+  border: 1px solid rgba(92,74,42,0.3);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.action-btn:hover {
+  color: var(--ink);
+  background: var(--tan-light);
+  border-color: var(--tan);
 }
 
 .message.system-note {
@@ -406,12 +444,81 @@ function addMessage(role, text, sources) {
 
   if (role === 'assistant') {
     div.innerHTML = text.replace(/\n/g, '<br>');
+
     if (sources && sources.length > 0) {
       const src = document.createElement('div');
       src.className = 'source-line';
-      src.textContent = 'Archive sources consulted: ' + sources.join(' · ');
+      src.innerHTML = '<strong>Archive sources consulted:</strong><br>' +
+        sources.map(s => `<span>› ${s}</span>`).join('<br>');
       div.appendChild(src);
     }
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+
+    // Download
+    const dlBtn = document.createElement('a');
+    dlBtn.className = 'action-btn';
+    dlBtn.innerHTML = '⬇ Download';
+    dlBtn.href = '#';
+    dlBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
+      const blob = new Blob([text + srcText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'alf-kirby-response.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    actions.appendChild(dlBtn);
+
+    // Copy
+    const copyBtn = document.createElement('a');
+    copyBtn.className = 'action-btn';
+    copyBtn.innerHTML = '⎘ Copy';
+    copyBtn.href = '#';
+    copyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
+      navigator.clipboard.writeText(text + srcText).then(() => {
+        copyBtn.innerHTML = '✓ Copied';
+        setTimeout(() => copyBtn.innerHTML = '⎘ Copy', 2000);
+      });
+    });
+    actions.appendChild(copyBtn);
+
+    // WhatsApp
+    const waBtn = document.createElement('a');
+    waBtn.className = 'action-btn';
+    waBtn.innerHTML = '✉ WhatsApp';
+    waBtn.target = '_blank';
+    const waText = encodeURIComponent(
+      'From Alf Kirby — The Glider Workshop Archive:\n\n' +
+      text.slice(0, 800) + (text.length > 800 ? '...' : '') +
+      '\n\nhttps://thecast.chat/archivist.html'
+    );
+    waBtn.href = `https://wa.me/?text=${waText}`;
+    actions.appendChild(waBtn);
+
+    // Email
+    const emailBtn = document.createElement('a');
+    emailBtn.className = 'action-btn';
+    emailBtn.innerHTML = '@ Email';
+    emailBtn.target = '_blank';
+    const srcText = sources && sources.length ? '\nSources: ' + sources.join(', ') : '';
+    const emailBody = encodeURIComponent(
+      'From Alf Kirby — The Glider Workshop Archive:\n\n' +
+      text + srcText +
+      '\n\nhttps://thecast.chat/archivist.html'
+    );
+    emailBtn.href = `mailto:?subject=Alf Kirby — Glider Workshop Archive&body=${emailBody}`;
+    actions.appendChild(emailBtn);
+
+    div.appendChild(actions);
+
   } else {
     div.textContent = text;
   }
