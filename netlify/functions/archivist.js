@@ -213,21 +213,23 @@ exports.handler = async function(event, context) {
 
     const docContent = [];
     const skippedDocs = [];
+    const MAX_CHARS = 35000; // Keep well within Netlify 26s timeout
 
-    for (const doc of relevantDocs) {
+    // Fetch documents in parallel rather than sequentially
+    await Promise.all(relevantDocs.map(async (doc) => {
       try {
         const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
-        if (!meta.download_url) continue;
+        if (!meta.download_url) return;
 
         const rawBuffer = await fetchRawUrl(meta.download_url);
         docContent.push({
           type: 'text',
-          text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, 80000)}`
+          text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, MAX_CHARS)}`
         });
       } catch (e) {
         console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
       }
-    }
+    }));
 
     const userContent = [];
     if (docContent.length > 0) {
