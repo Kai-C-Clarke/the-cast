@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /.netlify/
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+Sitemap: https://thecast.chat/sitemap.xml
