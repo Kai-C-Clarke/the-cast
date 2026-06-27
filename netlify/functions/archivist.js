@@ -230,7 +230,8 @@ exports.handler = async function(event, context) {
         const rawBuffer = await fetchRawUrl(meta.download_url);
         docContent.push({
           type: 'text',
-          text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, MAX_CHARS)}`
+          text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, MAX_CHARS)}`,
+          cache_control: { type: 'ephemeral' }
         });
       } catch (e) {
         console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
@@ -258,7 +259,7 @@ exports.handler = async function(event, context) {
     const response = await anthropicPost({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
-      system: ARCHIVIST_SYSTEM,
+      system: [{ type: 'text', text: ARCHIVIST_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: allMessages
     });
 
