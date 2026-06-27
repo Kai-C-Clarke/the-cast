@@ -416,29 +416,89 @@ body {
   font-family: 'Special Elite', monospace;
 }
 
+
+.archive-search {
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid var(--worn);
+}
+.archive-search input {
+  width: 100%;
+  background: var(--paper);
+  color: var(--text);
+  border: 1px solid var(--worn);
+  border-radius: 3px;
+  padding: 6px 10px;
+  font-family: 'Source Serif 4', serif;
+  font-size: 0.85rem;
+  outline: none;
+}
+.archive-search input:focus { border-color: var(--tan); }
+.archive-search input::placeholder { color: var(--text-dim); font-style: italic; }
+
 .archive-contents ul {
   list-style: none;
-  padding: 12px 16px 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 4px 20px;
-  max-height: 400px;
+  padding: 0;
+  display: block;
+  max-height: 420px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
+.category-group { margin-bottom: 4px; }
+
+.category-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 7px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(92,74,42,0.2);
+}
+.category-toggle:hover { background: rgba(196,154,60,0.08); }
+
+.category-icon { font-size: 0.9rem; width: 18px; text-align: center; }
+.category-name {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tan-light);
+  font-weight: bold;
+  flex: 1;
+}
+.category-arrow {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+.category-toggle.open .category-arrow { transform: rotate(90deg); }
+.category-count {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  font-family: 'Special Elite', monospace;
+}
+
+.category-docs {
+  display: none;
+  padding: 4px 0 6px 0;
+}
+.category-docs.open { display: block; }
+
 .archive-contents li {
   font-size: 0.8rem;
   color: var(--text-dim);
-  padding-left: 0;
-  position: relative;
-  line-height: 1.5;
+  padding: 2px 16px 2px 36px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+  line-height: 1.5;
 }
-.archive-contents li::before { content: none; }
+.archive-contents li.hidden { display: none; }
 
 .archive-contents li .doc-name {
   flex: 1;
@@ -463,10 +523,14 @@ body {
   border-radius: 2px;
   flex-shrink: 0;
 }
-.archive-contents li a.dl-link:hover {
-  background: var(--tan);
-  color: var(--ink);
+.archive-contents li a.dl-link:hover { background: var(--tan); color: var(--ink); }
+.no-results {
+  padding: 10px 16px;
+  font-style: italic;
+  color: var(--text-dim);
+  font-size: 0.82rem;
 }
+
 
 </style>
 </head>
@@ -721,6 +785,16 @@ function formatFileName(name) {
     .replace(/Cae/g, 'CAE');
 }
 
+const CATEGORY_ICONS = {
+  'BGA_Standard_Repairs': '📋',
+  'wood_construction': '🪵',
+  'adhesives_and_finishing': '🔧',
+  'composite_repair': '🔩',
+  'fabric_covering': '🧵',
+  'general_airworthiness': '✈️',
+  'gliding_history_and_literature': '📖'
+};
+
 async function loadArchiveContents() {
   const list = document.getElementById('archive-list');
   try {
@@ -729,28 +803,54 @@ async function loadArchiveContents() {
 
     list.innerHTML = '';
     let totalCount = 0;
-
     const BASE_RAW = 'https://raw.githubusercontent.com/Kai-C-Clarke/vintage-glider-knowledge-base/main/';
+
+    // Add search box
+    const searchDiv = document.createElement('div');
+    searchDiv.className = 'archive-search';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Filter documents… e.g. spruce, aerodux, altimeter';
+    searchInput.addEventListener('input', () => filterDocs(searchInput.value));
+    searchDiv.appendChild(searchInput);
+    list.parentElement.insertBefore(searchDiv, list);
 
     for (const { folder, docs } of results) {
       if (!docs || docs.length === 0) continue;
 
-      const header = document.createElement('li');
-      header.className = 'folder-header';
-      header.textContent = FOLDER_LABELS[folder] || folder;
-      list.appendChild(header);
+      const group = document.createElement('div');
+      group.className = 'category-group';
+      group.dataset.folder = folder;
+
+      // Category toggle button
+      const toggle = document.createElement('button');
+      toggle.className = 'category-toggle';
+      toggle.innerHTML = `
+        <span class="category-icon">${CATEGORY_ICONS[folder] || '📄'}</span>
+        <span class="category-name">${FOLDER_LABELS[folder] || folder}</span>
+        <span class="category-count">${docs.length}</span>
+        <span class="category-arrow">▸</span>
+      `;
+      toggle.addEventListener('click', () => {
+        toggle.classList.toggle('open');
+        docsDiv.classList.toggle('open');
+      });
+      group.appendChild(toggle);
+
+      // Docs list
+      const docsDiv = document.createElement('div');
+      docsDiv.className = 'category-docs';
 
       for (const name of docs) {
         const li = document.createElement('li');
+        li.dataset.name = formatFileName(name).toLowerCase();
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'doc-name';
         nameSpan.textContent = formatFileName(name);
         li.appendChild(nameSpan);
 
-        // Download link — points to raw file on GitHub
-        const subpath = name.includes('/') ? name : name;
-        const rawUrl = `${BASE_RAW}${folder}/${subpath}`;
+        const rawUrl = `${BASE_RAW}${folder}/${name}`;
         const dl = document.createElement('a');
         dl.className = 'dl-link';
         dl.textContent = '↓';
@@ -759,9 +859,12 @@ async function loadArchiveContents() {
         dl.title = 'Download ' + formatFileName(name);
         li.appendChild(dl);
 
-        list.appendChild(li);
+        docsDiv.appendChild(li);
         totalCount++;
       }
+
+      group.appendChild(docsDiv);
+      list.appendChild(group);
     }
 
     const countEl = document.getElementById('doc-count');
@@ -771,6 +874,35 @@ async function loadArchiveContents() {
     list.innerHTML = '<li>Could not load archive contents.</li>';
     console.error('Archive load error:', e);
   }
+}
+
+function filterDocs(query) {
+  const q = query.toLowerCase().trim();
+  const groups = document.querySelectorAll('.category-group');
+  let anyVisible = false;
+
+  groups.forEach(group => {
+    const docs = group.querySelectorAll('li');
+    let groupVisible = false;
+    docs.forEach(li => {
+      const match = !q || li.dataset.name.includes(q);
+      li.classList.toggle('hidden', !match);
+      if (match) groupVisible = true;
+    });
+
+    // Auto-expand categories with matches, collapse empty ones
+    const toggle = group.querySelector('.category-toggle');
+    const docsDiv = group.querySelector('.category-docs');
+    if (q && groupVisible) {
+      toggle.classList.add('open');
+      docsDiv.classList.add('open');
+    } else if (q && !groupVisible) {
+      toggle.classList.remove('open');
+      docsDiv.classList.remove('open');
+    }
+    group.style.display = groupVisible || !q ? '' : 'none';
+    if (groupVisible) anyVisible = true;
+  });
 }
 
 loadArchiveContents();
