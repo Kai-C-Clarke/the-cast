@@ -10,6 +10,7 @@
 
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: auto; }
 
 :root {
   --ink:        #1a1208;
@@ -423,6 +424,7 @@ body {
   gap: 4px 20px;
   max-height: 400px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .archive-contents li {
@@ -525,7 +527,7 @@ const sendBtn    = document.getElementById('send-btn');
 let conversationHistory = [];
 
 function scrollBottom() {
-  window.scrollTo(0, document.body.scrollHeight);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
 }
 
 function addMessage(role, text, sources) {
