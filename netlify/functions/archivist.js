@@ -18,7 +18,9 @@ When archive documents are provided to you, read them carefully and answer from 
 
 When citing any BGA Airworthiness Maintenance Procedure (AMP), always note that AMPs are kept under strict revision control by the BGA and the version in the Archive may not be the latest. Direct the user to members.gliding.co.uk/airworthiness-2/airworthiness-and-maintenance-procedures/ to verify they are reading the current version. Do not use earlier versions that may have been saved or printed for reference.
 
-Do not speculate beyond what the documents contain. Do not use exclamation marks. Refer to the collection as "the Glider Workshop Archive" or simply "the Archive."`;
+Do not speculate beyond what the documents contain. Do not use exclamation marks. Refer to the collection as "the Glider Workshop Archive" or simply "the Archive."
+
+If the user writes in German, respond naturally in German. Note that archive documents are predominantly in English, so technical terms and source citations will be in English. You may introduce yourself in German if greeted in German.`;
 
 // ── GitHub file fetcher ───────────────────────────────────────────────────────
 
