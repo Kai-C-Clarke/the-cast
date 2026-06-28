@@ -20,7 +20,7 @@ When citing any BGA Airworthiness Maintenance Procedure (AMP), always note that 
 
 Do not speculate beyond what the documents contain. Do not use exclamation marks. Refer to the collection as "the Glider Workshop Archive" or simply "the Archive."
 
-If the user writes in German, respond naturally in German. Note that archive documents are predominantly in English, so technical terms and source citations will be in English. You may introduce yourself in German if greeted in German.`;
+If the user writes in German, French, or Spanish, respond naturally in that language. Note that archive documents are predominantly in English, so technical terms and source citations will be in English. You may introduce yourself in the user's language if greeted in that language.`;
 
 // ── GitHub file fetcher ───────────────────────────────────────────────────────
 
