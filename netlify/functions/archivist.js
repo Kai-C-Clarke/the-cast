@@ -1,6 +1,7 @@
 const https = require('https');
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
 
 const CORS_HEADERS = {
@@ -32,7 +33,8 @@ function githubGet(path) {
       method: 'GET',
       headers: {
         'User-Agent': 'thecast-archivist',
-        'Accept': 'application/vnd.github.v3+json'
+        'Accept': 'application/vnd.github.v3+json',
+        ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
       }
     };
     const req = https.request(options, (res) => {
@@ -76,7 +78,6 @@ const FILE_INDEX = [
   { keywords: ['metal','steel','aluminium','aluminum','rivet','section 2'], path: 'BGA_Standard_Repairs/section2_text.txt', label: 'BGA Standard Repairs — Section 2 (Metal)' },
   { keywords: ['standard repairs','foreword','general','introduction','bga repairs'], path: 'BGA_Standard_Repairs/foreword_text.txt', label: 'BGA Standard Repairs — Foreword' },
   { keywords: ['standard repairs','section 1'], path: 'BGA_Standard_Repairs/section1_text.txt', label: 'BGA Standard Repairs — Section 1' },
-  { keywords: ['standard repairs','section 5'], path: 'BGA_Standard_Repairs/section5_text.txt', label: 'BGA Standard Repairs — Section 5' },
   { keywords: ['standard repairs','section 6'], path: 'BGA_Standard_Repairs/section6_text.txt', label: 'BGA Standard Repairs — Section 6' },
 
   // Adhesives
@@ -130,8 +131,6 @@ const FILE_INDEX = [
   { keywords: ['bonding','grounding','wooden glider','vintage bonding','static wood','wood conductor','p-static radio','radio installation','transponder installation','retrofit radio','wood moisture','static discharge wood'], path: 'general_airworthiness/electrical_bonding_vintage_wooden_gliders_note_2026.txt', label: 'Electrical Bonding in Vintage Wooden Gliders — Why It Is Absent (2026)' },
   { keywords: ['piggott','derek piggott','cumulonimbus','thunderstorm','lightning strike','skylark','lasham','altitude record','electric shock','control column shock','cloud flying','cb','hypoxia','ice controls'], path: 'gliding_history_and_literature/derek_piggott_cumulonimbus_1955_case_study.txt', label: 'Derek Piggott — Cumulonimbus Encounter 1955 (Lightning Case Study)' },
   { keywords: ['ac43','fabric','covering','dope','polyester','ceconite','rib stitch'], path: 'wood_construction/ac43_chapters/02_chapter_2_fabric_covering.txt', label: 'AC43.13-1B — Fabric Covering' },
-  { keywords: ['anc18','anc-18','design wood','aircraft structure design'], path: 'wood_construction/anc18_design_wood_aircraft_structures.pdf', label: 'ANC-18 — Design of Wood Aircraft Structures' },
-  { keywords: ['anc19','anc-19','inspection fabrication','wood inspection'], path: 'wood_construction/anc19_wood_aircraft_inspection_fabrication.pdf', label: 'ANC-19 — Wood Aircraft Inspection and Fabrication' },
 
   // History and literature
   { keywords: ['kronfeld','soaring','thermal','history','wave','ridge','gliding'], path: 'gliding_history_and_literature/kronfeld_chapters/part_01.txt', label: 'Kronfeld — On Gliding and Soaring (Part 1)' },
@@ -220,20 +219,24 @@ exports.handler = async function(event, context) {
 
   try {
     const { messages } = JSON.parse(event.body);
-    const latestQuery = (messages || []).filter(m => m.role === 'user').slice(-1)[0]?.content || '';
-    const relevantDocs = selectDocuments(latestQuery);
+    const userTurns = (messages || []).filter(m => m.role === 'user');
+    const latestQuery = userTurns.slice(-1)[0]?.content || '';
+    // Route on the last two user turns so short follow-ups ("and for solid spruce?") keep their subject
+    const routingQuery = userTurns.slice(-2).map(m => m.content).join(' ');
+    const relevantDocs = selectDocuments(routingQuery);
 
     console.log(`[archivist] Query: "${latestQuery.slice(0,80)}" | Docs: ${relevantDocs.map(d=>d.label).join(', ') || 'none'}`);
 
     const docContent = [];
-    const skippedDocs = [];
+    const fetchedLabels = [];
+    const failedLabels = [];
     const MAX_CHARS = 35000; // Keep well within Netlify 26s timeout
 
     // Fetch documents in parallel rather than sequentially
     await Promise.all(relevantDocs.map(async (doc) => {
       try {
         const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
-        if (!meta.download_url) return;
+        if (!meta.download_url) { failedLabels.push(doc.label); return; }
 
         const rawBuffer = await fetchRawUrl(meta.download_url);
         docContent.push({
@@ -241,7 +244,9 @@ exports.handler = async function(event, context) {
           text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, MAX_CHARS)}`,
           cache_control: { type: 'ephemeral' }
         });
+        fetchedLabels.push(doc.label);
       } catch (e) {
+        failedLabels.push(doc.label);
         console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
       }
     }));
@@ -250,13 +255,13 @@ exports.handler = async function(event, context) {
     if (docContent.length > 0) {
       userContent.push(...docContent);
       let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
-      if (skippedDocs.length > 0) {
-        contextNote += `\n\nNote: The following documents were identified as relevant but are too large to load directly (over 4MB): ${skippedDocs.join(', ')}. Answer from your general knowledge of these sources where you can, and note that the user may wish to consult those documents directly.`;
+      if (failedLabels.length > 0) {
+        contextNote += `\n\nNote: The following documents were identified as relevant but could not be retrieved just now: ${failedLabels.join(', ')}. Do not claim to have consulted them. If they matter to the answer, say plainly that they could not be reached and suggest the user try again.`;
       }
       contextNote += `\n\nUser's question: ${latestQuery}`;
       userContent.push({ type: 'text', text: contextNote });
-    } else if (skippedDocs.length > 0) {
-      userContent.push({ type: 'text', text: `The most relevant documents (${skippedDocs.join(', ')}) are too large to load directly. Answer from your general knowledge of these sources where you can, noting which document the user should consult. User's question: ${latestQuery}` });
+    } else if (failedLabels.length > 0) {
+      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly. User's question: ${latestQuery}` });
     } else {
       userContent.push({ type: 'text', text: latestQuery });
     }
@@ -281,7 +286,7 @@ exports.handler = async function(event, context) {
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ reply, sources: relevantDocs.map(d => d.label) })
+      body: JSON.stringify({ reply, sources: fetchedLabels })
     };
 
   } catch (err) {
@@ -293,3 +298,4 @@ exports.handler = async function(event, context) {
     };
   }
 };
+
