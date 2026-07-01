@@ -177,6 +177,75 @@ function selectDocuments(query) {
   return scored.slice(0, 2);
 }
 
+// ── Conversation log (private repo, human review before anything enters the Archive) ──
+
+const LOG_REPO = 'Kai-C-Clarke/glider-workshop';
+
+function githubApi(method, repo, path, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const body = bodyObj ? JSON.stringify(bodyObj) : null;
+    const options = {
+      hostname: 'api.github.com',
+      path: `/repos/${repo}/contents/${path}`,
+      method,
+      headers: {
+        'User-Agent': 'thecast-archivist',
+        'Accept': 'application/vnd.github.v3+json',
+        ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {}),
+        ...(body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {})
+      }
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, json: JSON.parse(data || '{}') }); }
+        catch (e) { resolve({ status: res.statusCode, json: {} }); }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+async function logConversation(question, reply, fetchedLabels, failedLabels) {
+  if (!GITHUB_TOKEN) return;
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 16);
+  const path = `alf/conversation-log/${day}.md`;
+
+  let entry = `\n---\n### ${day} ${time} UTC\n**Q:** ${question}\n\n`;
+  entry += `**Sources:** ${fetchedLabels.join('; ') || 'none'}`;
+  if (failedLabels.length > 0) entry += ` | FAILED: ${failedLabels.join('; ')}`;
+  entry += `\n\n**A:** ${reply}\n`;
+
+  // Two attempts to absorb a concurrent-write SHA conflict
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const cur = await githubApi('GET', LOG_REPO, path);
+      let content, sha;
+      if (cur.status === 200 && cur.json.content) {
+        content = Buffer.from(cur.json.content, 'base64').toString('utf8') + entry;
+        sha = cur.json.sha;
+      } else {
+        content = `# Alf conversation log — ${day}\nReview weekly. Nothing here enters the Archive without promotion to a reviewed note.\n` + entry;
+        sha = undefined;
+      }
+      const put = await githubApi('PUT', LOG_REPO, path, {
+        message: `Alf log ${day} ${time}`,
+        content: Buffer.from(content).toString('base64'),
+        ...(sha ? { sha } : {})
+      });
+      if (put.status === 200 || put.status === 201) return;
+      console.log(`[archivist] Log PUT status ${put.status}, attempt ${attempt + 1}`);
+    } catch (e) {
+      console.log(`[archivist] Log attempt ${attempt + 1} failed: ${e.message}`);
+    }
+  }
+}
+
 // ── Anthropic API call ────────────────────────────────────────────────────────
 
 function anthropicPost(payload) {
@@ -282,6 +351,17 @@ exports.handler = async function(event, context) {
 
     const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
     console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
+
+    // Log the exchange for weekly review (disclosed on page). Time-boxed and
+    // failure-tolerant: a slow or failed log write must never delay the answer.
+    try {
+      await Promise.race([
+        logConversation(latestQuery, reply, fetchedLabels, failedLabels),
+        new Promise(resolve => setTimeout(resolve, 4000))
+      ]);
+    } catch (e) {
+      console.log(`[archivist] Log skipped: ${e.message}`);
+    }
 
     return {
       statusCode: 200,
