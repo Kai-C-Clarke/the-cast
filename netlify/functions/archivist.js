@@ -21,6 +21,8 @@ When citing any BGA Airworthiness Maintenance Procedure (AMP), always note that 
 
 Do not speculate beyond what the documents contain. Do not use exclamation marks. Refer to the collection as "the Glider Workshop Archive" or simply "the Archive."
 
+When TNS search results are provided to you, they come from an index of BGA Technical News Sheets. If a result is relevant to the question, tell the user the topic is covered in that TNS and give them the BGA library link so they can read the authoritative current copy. Quote only the short matched lines provided — the full TNS text is not in the Archive and you have not read it. The TNS index covers born-digital issues from roughly 2008 to the present; earlier sheets back to 1975 exist and can be browsed at members.gliding.co.uk/library/tns/.
+
 If the user writes in German, French, or Spanish, respond naturally in that language. Note that archive documents are predominantly in English, so technical terms and source citations will be in English. You may introduce yourself in the user's language if greeted in that language.`;
 
 // ── GitHub file fetcher ───────────────────────────────────────────────────────
@@ -177,6 +179,52 @@ function selectDocuments(query) {
   return scored.slice(0, 2);
 }
 
+// ── TNS finder (index lives in the PRIVATE repo; Alf surfaces links + matched lines only) ──
+
+const TNS_INDEX_PATH = 'alf/tns_fulltext.json';
+let tnsIndexCache = null; // survives warm invocations
+
+const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that','have','from','they',
+  'should','could','would','about','there','their','been','does','glider','gliders','vintage','archive',
+  'please','need','know','tell','used','using','into','over','some','also','than','then','them','will',
+  'aircraft','sailplane','wooden','wood','repair','repairs','inspection','inspect','check','question']);
+
+async function loadTnsIndex() {
+  if (tnsIndexCache) return tnsIndexCache;
+  const res = await githubApi('GET', LOG_REPO, TNS_INDEX_PATH);
+  if (res.status !== 200 || !res.json.content) throw new Error('TNS index fetch failed: ' + res.status);
+  tnsIndexCache = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
+  return tnsIndexCache;
+}
+
+async function searchTNS(query) {
+  const index = await loadTnsIndex();
+  const raw = query.toLowerCase().match(/[a-z0-9][a-z0-9.\-]{1,}/g) || [];
+  // keep words of 4+ chars, plus short type designators containing a digit (k8, ka6, t21, ls4)
+  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w))) && !TNS_STOPWORDS.has(w)))];
+  if (words.length === 0) return [];
+
+  const results = [];
+  for (const entry of index.entries) {
+    const text = entry.text.toLowerCase();
+    const hits = words.filter(w => text.includes(w));
+    if (hits.length === 0) continue;
+    // require 2+ distinct keyword hits unless the query only offered one keyword
+    if (hits.length < Math.min(2, words.length)) continue;
+    const score = hits.length;
+    // snippets: lines containing the most keywords
+    const lines = entry.text.split('\n');
+    const snips = lines
+      .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length }))
+      .filter(x => x.n > 0)
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 2)
+      .map(x => x.l.slice(0, 160));
+    results.push({ label: entry.label, url: entry.url, score, snips });
+  }
+  return results.sort((a, b) => b.score - a.score).slice(0, 3);
+}
+
 // ── Conversation log (private repo, human review before anything enters the Archive) ──
 
 const LOG_REPO = 'Kai-C-Clarke/glider-workshop';
@@ -301,8 +349,11 @@ exports.handler = async function(event, context) {
     const failedLabels = [];
     const MAX_CHARS = 35000; // Keep well within Netlify 26s timeout
 
-    // Fetch documents in parallel rather than sequentially
-    await Promise.all(relevantDocs.map(async (doc) => {
+    // Fetch documents in parallel rather than sequentially; TNS search runs alongside,
+    // time-boxed — a slow or failed TNS lookup must never delay or break the answer.
+    let tnsResults = [];
+    await Promise.all([
+      ...relevantDocs.map(async (doc) => {
       try {
         const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
         if (!meta.download_url) { failedLabels.push(doc.label); return; }
@@ -318,21 +369,36 @@ exports.handler = async function(event, context) {
         failedLabels.push(doc.label);
         console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
       }
-    }));
+    }),
+      Promise.race([
+        searchTNS(routingQuery).then(r => { tnsResults = r; }),
+        new Promise(resolve => setTimeout(resolve, 6000))
+      ]).catch(e => console.log(`[archivist] TNS search skipped: ${e.message}`))
+    ]);
+
+    if (tnsResults.length > 0) {
+      console.log(`[archivist] TNS hits: ${tnsResults.map(t => t.label).join(', ')}`);
+    }
 
     const userContent = [];
+    const tnsNote = tnsResults.length > 0
+      ? `\n\nTNS search results (index of BGA Technical News Sheets — full text NOT in the Archive):\n` +
+        tnsResults.map(t => `- ${t.label} — ${t.url}\n  matched: ${t.snips.map(s => `"${s}"`).join(' | ')}`).join('\n') +
+        `\nIf any of these are relevant, tell the user the topic is covered in that TNS and give the link.`
+      : '';
     if (docContent.length > 0) {
       userContent.push(...docContent);
       let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
       if (failedLabels.length > 0) {
         contextNote += `\n\nNote: The following documents were identified as relevant but could not be retrieved just now: ${failedLabels.join(', ')}. Do not claim to have consulted them. If they matter to the answer, say plainly that they could not be reached and suggest the user try again.`;
       }
+      contextNote += tnsNote;
       contextNote += `\n\nUser's question: ${latestQuery}`;
       userContent.push({ type: 'text', text: contextNote });
     } else if (failedLabels.length > 0) {
-      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly. User's question: ${latestQuery}` });
+      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote} User's question: ${latestQuery}` });
     } else {
-      userContent.push({ type: 'text', text: latestQuery });
+      userContent.push({ type: 'text', text: tnsNote ? `${tnsNote}\n\nUser's question: ${latestQuery}` : latestQuery });
     }
 
     const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
