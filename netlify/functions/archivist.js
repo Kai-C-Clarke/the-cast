@@ -184,6 +184,9 @@ function selectDocuments(query) {
 const TNS_INDEX_PATH = 'alf/tns_fulltext.json';
 let tnsIndexCache = null; // survives warm invocations
 
+const REFERENCE_INDEX_PATH = 'alf/reference_fulltext.json';
+let referenceIndexCache = null; // survives warm invocations
+
 const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that','have','from','they',
   'should','could','would','about','there','their','been','does','glider','gliders','vintage','archive',
   'please','need','know','tell','used','using','into','over','some','also','than','then','them','will',
@@ -223,6 +226,41 @@ async function searchTNS(query) {
     results.push({ label: entry.label, url: entry.url, score, snips });
   }
   return results.sort((a, b) => b.score - a.score).slice(0, 3);
+}
+
+// ── Reference document search (BGA Standard Repairs, Compendium, Inspector Course, Datasheets, AC43, OM100) ──
+
+async function loadReferenceIndex() {
+  if (referenceIndexCache) return referenceIndexCache;
+  const res = await githubApi('GET', LOG_REPO, REFERENCE_INDEX_PATH);
+  if (res.status !== 200 || !res.json.content) throw new Error('Reference index fetch failed: ' + res.status);
+  referenceIndexCache = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
+  return referenceIndexCache;
+}
+
+async function searchReference(query) {
+  const index = await loadReferenceIndex();
+  const raw = query.toLowerCase().match(/[a-z0-9][a-z0-9.\-]{1,}/g) || [];
+  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w))) && !TNS_STOPWORDS.has(w)))];
+  if (words.length === 0) return [];
+
+  const results = [];
+  for (const entry of index.entries) {
+    const text = entry.text.toLowerCase();
+    const hits = words.filter(w => text.includes(w));
+    if (hits.length === 0) continue;
+    if (hits.length < Math.min(2, words.length)) continue;
+    const score = hits.length;
+    const lines = entry.text.split('\n');
+    const snips = lines
+      .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length }))
+      .filter(x => x.n > 0)
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 3)
+      .map(x => x.l.trim().slice(0, 200));
+    results.push({ label: entry.label, source: entry.source, tier: entry.tier, score, snips });
+  }
+  return results.sort((a, b) => b.score - a.score).slice(0, 4);
 }
 
 // ── Conversation log (private repo, human review before anything enters the Archive) ──
@@ -352,6 +390,7 @@ exports.handler = async function(event, context) {
     // Fetch documents in parallel rather than sequentially; TNS search runs alongside,
     // time-boxed — a slow or failed TNS lookup must never delay or break the answer.
     let tnsResults = [];
+    let referenceResults = [];
     await Promise.all([
       ...relevantDocs.map(async (doc) => {
       try {
@@ -373,11 +412,18 @@ exports.handler = async function(event, context) {
       Promise.race([
         searchTNS(routingQuery).then(r => { tnsResults = r; }),
         new Promise(resolve => setTimeout(resolve, 6000))
-      ]).catch(e => console.log(`[archivist] TNS search skipped: ${e.message}`))
+      ]).catch(e => console.log(`[archivist] TNS search skipped: ${e.message}`)),
+      Promise.race([
+        searchReference(routingQuery).then(r => { referenceResults = r; }),
+        new Promise(resolve => setTimeout(resolve, 8000))
+      ]).catch(e => console.log(`[archivist] Reference search skipped: ${e.message}`))
     ]);
 
     if (tnsResults.length > 0) {
       console.log(`[archivist] TNS hits: ${tnsResults.map(t => t.label).join(', ')}`);
+    }
+    if (referenceResults.length > 0) {
+      console.log(`[archivist] Reference hits: ${referenceResults.map(r => r.label).join(', ')}`);
     }
 
     const userContent = [];
@@ -386,6 +432,15 @@ exports.handler = async function(event, context) {
         tnsResults.map(t => `- ${t.label} — ${t.url}\n  matched: ${t.snips.map(s => `"${s}"`).join(' | ')}`).join('\n') +
         `\nIf any of these are relevant, tell the user the topic is covered in that TNS and give the link.`
       : '';
+
+    const referenceNote = referenceResults.length > 0
+      ? `\n\nReference document search results (extracted text from BGA Standard Repairs, Compendium, Inspector Course, AC43.13-1B, Datasheets, OM100 records):\n` +
+        referenceResults.map(r =>
+          `- ${r.label} (Tier ${r.tier || 1})\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`
+        ).join('\n') +
+        `\nUse these passages to answer the question where relevant. Cite the document name. If a passage directly answers the question, quote the key phrase and say which document it comes from.`
+      : '';
+
     if (docContent.length > 0) {
       userContent.push(...docContent);
       let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
@@ -393,12 +448,13 @@ exports.handler = async function(event, context) {
         contextNote += `\n\nNote: The following documents were identified as relevant but could not be retrieved just now: ${failedLabels.join(', ')}. Do not claim to have consulted them. If they matter to the answer, say plainly that they could not be reached and suggest the user try again.`;
       }
       contextNote += tnsNote;
+      contextNote += referenceNote;
       contextNote += `\n\nUser's question: ${latestQuery}`;
       userContent.push({ type: 'text', text: contextNote });
     } else if (failedLabels.length > 0) {
-      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote} User's question: ${latestQuery}` });
+      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote}${referenceNote} User's question: ${latestQuery}` });
     } else {
-      userContent.push({ type: 'text', text: tnsNote ? `${tnsNote}\n\nUser's question: ${latestQuery}` : latestQuery });
+      userContent.push({ type: 'text', text: (tnsNote || referenceNote) ? `${tnsNote}${referenceNote}\n\nUser's question: ${latestQuery}` : latestQuery });
     }
 
     const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
