@@ -187,6 +187,16 @@ let tnsIndexCache = null; // survives warm invocations
 const REFERENCE_INDEX_PATH = 'alf/reference_fulltext.json';
 let referenceIndexCache = null; // survives warm invocations
 
+// Scanned TNS decade indexes (tesseract OCR, pre-2020)
+const TNS_DECADE_PATHS = {
+  '1970s': 'alf/tns_1970s.json',
+  '1980s': 'alf/tns_1980s.json',
+  '1990s': 'alf/tns_1990s.json',
+  '2000s': 'alf/tns_2000s.json',
+  '2010s': 'alf/tns_2010s.json',
+};
+const tnsDecadeCache = {};
+
 const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that','have','from','they',
   'should','could','would','about','there','their','been','does','glider','gliders','vintage','archive',
   'please','need','know','tell','used','using','into','over','some','also','than','then','them','will',
@@ -261,6 +271,43 @@ async function searchReference(query) {
     results.push({ label: entry.label, source: entry.source, tier: entry.tier, score, snips });
   }
   return results.sort((a, b) => b.score - a.score).slice(0, 4);
+}
+
+async function searchScannedTNS(query) {
+  // Search all decade indexes in parallel, merge and rank results
+  const raw = query.toLowerCase().match(/[a-z0-9][a-z0-9.\-]{1,}/g) || [];
+  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w))) && !TNS_STOPWORDS.has(w)))];
+  if (words.length === 0) return [];
+
+  const allResults = [];
+
+  await Promise.all(Object.entries(TNS_DECADE_PATHS).map(async ([decade, path]) => {
+    try {
+      if (!tnsDecadeCache[decade]) {
+        const res = await githubApi('GET', LOG_REPO, path);
+        if (res.status !== 200 || !res.json.content) return;
+        tnsDecadeCache[decade] = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
+      }
+      const index = tnsDecadeCache[decade];
+      for (const entry of index.entries) {
+        const text = entry.text.toLowerCase();
+        const hits = words.filter(w => text.includes(w));
+        if (hits.length < Math.min(2, words.length)) continue;
+        const lines = entry.text.split('\n');
+        const snips = lines
+          .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length }))
+          .filter(x => x.n > 0)
+          .sort((a, b) => b.n - a.n)
+          .slice(0, 2)
+          .map(x => x.l.trim().slice(0, 200));
+        allResults.push({ label: entry.label, source: entry.source, decade, score: hits.length, snips });
+      }
+    } catch (e) {
+      console.log(`[archivist] Scanned TNS ${decade} search skipped: ${e.message}`);
+    }
+  }));
+
+  return allResults.sort((a, b) => b.score - a.score).slice(0, 5);
 }
 
 // ── Conversation log (private repo, human review before anything enters the Archive) ──
@@ -391,6 +438,7 @@ exports.handler = async function(event, context) {
     // time-boxed — a slow or failed TNS lookup must never delay or break the answer.
     let tnsResults = [];
     let referenceResults = [];
+    let scannedTnsResults = [];
     await Promise.all([
       ...relevantDocs.map(async (doc) => {
       try {
@@ -416,7 +464,11 @@ exports.handler = async function(event, context) {
       Promise.race([
         searchReference(routingQuery).then(r => { referenceResults = r; }),
         new Promise(resolve => setTimeout(resolve, 8000))
-      ]).catch(e => console.log(`[archivist] Reference search skipped: ${e.message}`))
+      ]).catch(e => console.log(`[archivist] Reference search skipped: ${e.message}`)),
+      Promise.race([
+        searchScannedTNS(routingQuery).then(r => { scannedTnsResults = r; }),
+        new Promise(resolve => setTimeout(resolve, 12000))
+      ]).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`))
     ]);
 
     if (tnsResults.length > 0) {
@@ -424,6 +476,10 @@ exports.handler = async function(event, context) {
     }
     if (referenceResults.length > 0) {
       console.log(`[archivist] Reference hits: ${referenceResults.map(r => r.label).join(', ')}`);
+    }
+
+    if (scannedTnsResults.length > 0) {
+      console.log(`[archivist] Scanned TNS hits: ${scannedTnsResults.map(r => r.label).join(', ')}`);
     }
 
     const userContent = [];
@@ -441,6 +497,14 @@ exports.handler = async function(event, context) {
         `\nUse these passages to answer the question where relevant. Cite the document name. If a passage directly answers the question, quote the key phrase and say which document it comes from.`
       : '';
 
+    const scannedTnsNote = scannedTnsResults.length > 0
+      ? `\n\nScanned TNS search results (pre-2020 BGA Technical News Sheets, tesseract OCR — treat text as approximate):\n` +
+        scannedTnsResults.map(r =>
+          `- ${r.label} (${r.decade})\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`
+        ).join('\n') +
+        `\nNote: these are older scanned documents — OCR may have minor errors. Use for guidance and topic identification, not verbatim quotes.`
+      : '';
+
     if (docContent.length > 0) {
       userContent.push(...docContent);
       let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
@@ -449,12 +513,13 @@ exports.handler = async function(event, context) {
       }
       contextNote += tnsNote;
       contextNote += referenceNote;
+      contextNote += scannedTnsNote;
       contextNote += `\n\nUser's question: ${latestQuery}`;
       userContent.push({ type: 'text', text: contextNote });
     } else if (failedLabels.length > 0) {
-      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote}${referenceNote} User's question: ${latestQuery}` });
+      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote}${referenceNote}${scannedTnsNote} User's question: ${latestQuery}` });
     } else {
-      userContent.push({ type: 'text', text: (tnsNote || referenceNote) ? `${tnsNote}${referenceNote}\n\nUser's question: ${latestQuery}` : latestQuery });
+      userContent.push({ type: 'text', text: (tnsNote || referenceNote || scannedTnsNote) ? `${tnsNote}${referenceNote}${scannedTnsNote}\n\nUser's question: ${latestQuery}` : latestQuery });
     }
 
     const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
