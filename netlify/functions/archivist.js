@@ -172,7 +172,18 @@ const FILE_INDEX = [
   { keywords: ['modification','mod','non part 21','modify glider','alteration'], path: 'general_airworthiness/AMP/amp_2-3_modification_of_non-part_21_gliders.txt', label: 'AMP 2-3 — Modification of Non-Part 21 Gliders' },
   { keywords: ['narc','national arc','national airworthiness review','narc renewal'], path: 'general_airworthiness/AMP/amp_2-4_narc_renewal.txt', label: 'AMP 2-4 — NARC Renewal' },
   { keywords: ['certifying','bga glider','certify','non part 21','new glider'], path: 'general_airworthiness/AMP/amp_2-5_certifying_a_bga_glider.txt', label: 'AMP 2-5 — Certifying a BGA Glider' },
-  { keywords: ['control cable','flying control','cable','turnbuckle','nicopress','cable tension'], path: 'general_airworthiness/AMP/flying_control_cables.txt', label: 'AMP — Flying Control Cables' },
+  { keywords: ['control cable','flying control','cable tension','turnbuckle','wire lock','locking wire','nicopress','cable inspection','swaged','fraying','cable wear','cable fatigue','cable repair'], path: 'glider-workshop/reference/AMP/ingest/records/1430312110-4-7.json', label: 'AMP 4-7 — Flying Control Cables (BGA)' },
+  { keywords: ['arc renewal','airworthiness review','part 21','arc','airworthiness review certificate'], path: 'glider-workshop/reference/AMP/ingest/records/amp-bga-c-of-a-renewal-v2-5-jan-24.json', label: 'AMP 2-2 — BGA C of A Renewal' },
+  { keywords: ['narc','national airworthiness review','narc renewal'], path: 'glider-workshop/reference/AMP/ingest/records/amp-narc-renewal-v2-5-jan-24.json', label: 'AMP 2-4 — NARC Renewal' },
+  { keywords: ['seat harness','harness','belt','seat belt','restraint','lap strap'], path: 'glider-workshop/reference/AMP/ingest/records/amp-seat-harnesses-and-belts-v2-5-jan-24.json', label: 'AMP 1-5 — Seat Harnesses and Belts' },
+  { keywords: ['acceptable material','approved material','release note','material specification','parts','approved parts'], path: 'glider-workshop/reference/AMP/ingest/records/amp-1-15-acceptable-materials-and-parts.json', label: 'AMP 1-15 — Acceptable Materials and Parts' },
+  { keywords: ['inspector authorisation','inspector rating','inspector approval','bga inspector','i/c','inspector qualification'], path: 'glider-workshop/reference/AMP/ingest/records/amp-inspector-authorisation-and-rating-dec-23.json', label: 'AMP 1-2 — Inspector Authorisation and Ratings' },
+  { keywords: ['modification','non part 21','glider modification','mod','approved modification'], path: 'glider-workshop/reference/AMP/ingest/records/amp-modification-to-non-part-21-gliders-v2-5-jan-24.json', label: 'AMP 2-3 — Modification of Non-Part 21 Gliders' },
+  { keywords: ['a conditions','a condition flight','permit','non part 21 flight','experimental'], path: 'glider-workshop/reference/AMP/ingest/records/amp-a-conditions-flight-v2-5-jan-24.json', label: 'AMP 2-1 — A Conditions Flight' },
+  { keywords: ['complex maintenance','complex task','critical maintenance','complex repair'], path: 'glider-workshop/reference/AMP/ingest/records/amp-complex-maintenance-5-jan-2024.json', label: 'AMP 1-12 — Complex Maintenance' },
+  { keywords: ['registration','sailplane registration','aircraft registration','register glider'], path: 'glider-workshop/reference/AMP/ingest/records/amp-registration-procedure-for-sailplanes-v2-5-jan-24.json', label: 'AMP 1-13 — Registration Procedure for Sailplanes' },
+  { keywords: ['cs-stan','standard change','standard repair','cs stan'], path: 'glider-workshop/reference/AMP/ingest/records/inital-airworthiness-adopted-cs-stan-issue-4.json', label: 'CS-STAN Issue 4 — Standard Changes and Repairs' },
+  { keywords: ['certifying','certify bga','bga certification','non part 21 certify'], path: 'glider-workshop/reference/AMP/ingest/records/amp-2-5-bga-certification-process-non-part-21-gliders.json', label: 'AMP 2-5 — BGA Certification Process (Non-Part 21)' },
   { keywords: ['motor glider','engine','rotax','power plant','motorglider','engine inspection'], path: 'general_airworthiness/AMP/motor_glider_engine_inspection.txt', label: 'AMP — Motor Glider Engine Inspection and Repair' },
   { keywords: ['instrument','altimeter','variometer','airspeed','calibration','instrument repair','asi','pitot'], path: 'general_airworthiness/AMP/standard_repairs_5_instrument_repairs.txt', label: 'BGA Standard Repairs — Section 5 (Instrument Repairs)' },
   { keywords: ['weighing','weight schedule','mass balance','ballast','weighing record'], path: 'general_airworthiness/AMP/standard_repairs_6_weighing.txt', label: 'BGA Standard Repairs — Section 6 (Weighing)' },
@@ -459,13 +470,34 @@ exports.handler = async function(event, context) {
     await Promise.all([
       ...relevantDocs.map(async (doc) => {
       try {
-        const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
-        if (!meta.download_url) { failedLabels.push(doc.label); return; }
-
-        const rawBuffer = await fetchRawUrl(meta.download_url);
+        let fetchedText;
+        if (doc.path.startsWith('glider-workshop/')) {
+          // Fetch from glider-workshop repo (ingest JSON records)
+          const repoPath = doc.path.replace('glider-workshop/', '');
+          const meta = await githubApi('GET', LOG_REPO, repoPath);
+          if (!meta || !meta.content) { failedLabels.push(doc.label); return; }
+          const record = JSON.parse(Buffer.from(meta.content, 'base64').toString('utf8'));
+          // Extract full_text or concatenate page texts
+          fetchedText = record.full_text || 
+            (record.pages || []).map(p => p.text_content || p.text || '').filter(Boolean).join('\n\n');
+          // Prepend annotations if present
+          if (record.annotations && record.annotations.length > 0) {
+            const annBlock = '⚠ ANNOTATIONS (read first):\n' + record.annotations.map(a => `• ${a}`).join('\n') + '\n\n';
+            fetchedText = annBlock + fetchedText;
+          }
+          // Add currency note
+          const ingestDate = record.ingest && record.ingest.date ? record.ingest.date : 'unknown';
+          fetchedText += `\n\n[Downloaded: ${ingestDate}. AMPs are under strict BGA revision control — always verify the current version at members.gliding.co.uk/airworthiness-2/airworthiness-and-maintenance-procedures/]`;
+        } else {
+          // Fetch from vintage-glider-knowledge-base (standard archive)
+          const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
+          if (!meta.download_url) { failedLabels.push(doc.label); return; }
+          const rawBuffer = await fetchRawUrl(meta.download_url);
+          fetchedText = rawBuffer.toString('utf8');
+        }
         docContent.push({
           type: 'text',
-          text: `[Archive document: ${doc.label}]\n\n${rawBuffer.toString('utf8').slice(0, MAX_CHARS)}`,
+          text: `[Archive document: ${doc.label}]\n\n${fetchedText.slice(0, MAX_CHARS)}`,
           cache_control: { type: 'ephemeral' }
         });
         fetchedLabels.push(doc.label);
