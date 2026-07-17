@@ -474,9 +474,9 @@ exports.handler = async function(event, context) {
         if (doc.path.startsWith('glider-workshop/')) {
           // Fetch from glider-workshop repo (ingest JSON records)
           const repoPath = doc.path.replace('glider-workshop/', '');
-          const meta = await githubApi('GET', LOG_REPO, repoPath);
-          if (!meta || !meta.content) { failedLabels.push(doc.label); return; }
-          const record = JSON.parse(Buffer.from(meta.content, 'base64').toString('utf8'));
+          const res = await githubApi('GET', LOG_REPO, repoPath);
+          if (!res || res.status !== 200 || !res.json.content) { failedLabels.push(doc.label); return; }
+          const record = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
           // Extract full_text or concatenate page texts
           fetchedText = record.full_text || 
             (record.pages || []).map(p => p.text_content || p.text || '').filter(Boolean).join('\n\n');
