@@ -268,7 +268,16 @@ async function searchReference(query) {
       .sort((a, b) => b.n - a.n)
       .slice(0, 3)
       .map(x => x.l.trim().slice(0, 200));
-    results.push({ label: entry.label, source: entry.source, tier: entry.tier, score, snips });
+    results.push({ 
+      label: entry.label, 
+      source: entry.source, 
+      tier: entry.tier, 
+      score, 
+      snips,
+      annotations: entry.annotations || [],
+      subject_tags: entry.subject_tags || [],
+      aircraft_types: entry.aircraft_types || []
+    });
   }
   return results.sort((a, b) => b.score - a.score).slice(0, 4);
 }
@@ -491,10 +500,18 @@ exports.handler = async function(event, context) {
 
     const referenceNote = referenceResults.length > 0
       ? `\n\nReference document search results (extracted text from BGA Standard Repairs, Compendium, Inspector Course, AC43.13-1B, Datasheets, OM100 records):\n` +
-        referenceResults.map(r =>
-          `- ${r.label} (Tier ${r.tier || 1})\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`
-        ).join('\n') +
-        `\nUse these passages to answer the question where relevant. Cite the document name. If a passage directly answers the question, quote the key phrase and say which document it comes from.`
+        referenceResults.map(r => {
+          let entry = `- ${r.label} (Tier ${r.tier || 1})`;
+          if (r.annotations && r.annotations.length > 0) {
+            entry += `\n  ⚠ ANNOTATIONS (read first):\n` + r.annotations.map(a => `    • ${a}`).join('\n');
+          }
+          if (r.subject_tags && r.subject_tags.length > 0) {
+            entry += `\n  Subject tags: ${r.subject_tags.join(', ')}`;
+          }
+          entry += `\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`;
+          return entry;
+        }).join('\n') +
+        `\nUse these passages to answer the question. READ ANNOTATIONS FIRST — they contain warnings about superseded guidance and document currency. Cite the document name and page in your answer.`
       : '';
 
     const scannedTnsNote = scannedTnsResults.length > 0
