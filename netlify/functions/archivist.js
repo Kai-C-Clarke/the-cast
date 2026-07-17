@@ -75,6 +75,11 @@ function fetchRawUrl(url) {
 
 const FILE_INDEX = [
   // BGA Standard Repairs
+  { keywords: ['solid member','boom repair','boom','spar boom','rib boom','box member','spar repair','spar web','insertion repair','box spar','laminated member','spruce boom','scarf 15','15:1','solid spruce'], path: 'BGA_Standard_Repairs/section3_ch34_solid_member_repairs.txt', label: 'BGA Standard Repairs — Section 3 Chapter 3.4 (Solid Member Repairs)' },
+  { keywords: ['box member','box spar','spar cap','spar boom','box section','spar construction'], path: 'BGA_Standard_Repairs/section3_ch35_box_member_repairs.txt', label: 'BGA Standard Repairs — Section 3 Chapter 3.5 (Box Member Repairs)' },
+  { keywords: ['ply repair','plywood repair','ply patch','ply scarf','ply skin','rib grommet','leading edge repair','scarf ply','12:1','ply panel','skin repair'], path: 'BGA_Standard_Repairs/section3_ch33_ply_repairs.txt', label: 'BGA Standard Repairs — Section 3 Chapter 3.3 (Ply Repairs)' },
+  { keywords: ['aerodux','aerolite','glue','glueing','gluing','resorcinol','casein','urea formaldehyde','hardener','mixing glue','pot life','setting time'], path: 'BGA_Standard_Repairs/section3_ch32_glues_and_gluing.txt', label: 'BGA Standard Repairs — Section 3 Chapter 3.2 (Glues and Gluing)' },
+  { keywords: ['timber','spruce','birch','gaboon','ply','plywood','v37','v35','compression shake','grain','moisture content','specification'], path: 'BGA_Standard_Repairs/section3_ch31_timbers_and_plywoods.txt', label: 'BGA Standard Repairs — Section 3 Chapter 3.1 (Timbers and Plywoods)' },
   { keywords: ['wood','timber','ply','plywood','spruce','spar','stringer','grain','moisture','scarf','joint','aerodux','resorcinol','casein','repair','section 3'], path: 'BGA_Standard_Repairs/section3_text.txt', label: 'BGA Standard Repairs — Section 3 (Wood Repairs)' },
   { keywords: ['fabric','dope','ceconite','polyester','covering','rib stitch','tautening','section 4','repair fabric','fabric repair','wing panel','damaged fabric','patch','cellulose dope','butyrate dope','recover'], path: 'BGA_Standard_Repairs/section4_text.txt', label: 'BGA Standard Repairs — Section 4 (Fabric)' },
   { keywords: ['metal','steel','aluminium','aluminum','rivet','section 2'], path: 'BGA_Standard_Repairs/section2_text.txt', label: 'BGA Standard Repairs — Section 2 (Metal)' },
