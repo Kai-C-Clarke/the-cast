@@ -119,6 +119,7 @@ const FILE_INDEX = [
   // BGA Compendium — Type specific
   { keywords: ['schleicher','ka-6','ka6','k-8','k8','k-13','k13','ask','ka2','ka8','wood schleicher'], path: 'general_airworthiness/BGA-Compendium-Schleicher-Wood_text.txt', label: 'BGA Compendium — Schleicher Wood Types' },
   { keywords: ['schempp','hirth','shk','cirrus','standard cirrus','nimbus','duo discus','discus','ventus','janus'], path: 'general_airworthiness/BGA-Compendium-Schempp-Hirth_text.txt', label: 'BGA Compendium — Schempp-Hirth' },
+  { keywords: ['swallow t45','t.45','t45 pilots','swallow pilots','swallow stall','swallow performance','swallow limits','swallow weight','swallow aerotow','swallow winch','swallow spin','swallow acrobatic'], path: 'glider-workshop/reference/type-docs/swallow-t45/ingest/records/swallow-t45-pilots-notes-technical-data.json', label: 'Slingsby T.45 Swallow — Pilots Notes & Technical Data' },
   { keywords: ['slingsby','prefect','tutor','swallow','skylark','capstan','kite','petrel','dart','t21','t38','t49','t51'], path: 'general_airworthiness/BGA-Compendium-Slingsby_text.txt', label: 'BGA Compendium — Slingsby' },
   { keywords: ['elliots','olympia','eon','olympia 2b','olympia 460','eon olympia'], path: 'general_airworthiness/BGA-Compendium-Elliots_text.txt', label: 'BGA Compendium — Elliots (Olympia)' },
 
