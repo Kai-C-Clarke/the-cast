@@ -295,7 +295,11 @@ async function searchReference(query) {
     // covering it?" buried wb-bocian under fabric documents matched on "covering".
     const types = (entry.aircraft_types || []).map(t => String(t).toLowerCase());
     const typeHits = words.filter(w => types.some(t => t.includes(w))).length;
-    const score = hits.length + typeHits * 3;
+    // Label match is equally strong: wb- datasheet records carry the type name in
+    // the label but have no aircraft_types field (corpus-side fix queued 26/7/26)
+    const labelLower = (entry.label || '').toLowerCase();
+    const labelHits = words.filter(w => labelLower.includes(w)).length;
+    const score = hits.length + (typeHits + labelHits) * 3;
     const lines = entry.text.split('\n');
     const snips = lines
       .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length, d: /\d/.test(l) ? 1 : 0 }))
