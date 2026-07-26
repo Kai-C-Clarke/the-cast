@@ -291,9 +291,9 @@ async function searchReference(query) {
     const score = hits.length;
     const lines = entry.text.split('\n');
     const snips = lines
-      .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length }))
+      .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length, d: /\d/.test(l) ? 1 : 0 }))
       .filter(x => x.n > 0)
-      .sort((a, b) => b.n - a.n)
+      .sort((a, b) => (b.n - a.n) || (b.d - a.d))
       .slice(0, 3)
       .map(x => x.l.trim().slice(0, 200));
     results.push({ 
