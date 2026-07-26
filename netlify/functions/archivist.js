@@ -219,6 +219,10 @@ const TNS_DECADE_PATHS = {
 };
 const tnsDecadeCache = {};
 
+// Short aviation terms that must survive the 4+ char keyword filter (fix 26/7/26:
+// "VNE of the Bocian" searched on "bocian" alone, so table lines were never quoted)
+const AVIATION_SHORT_TERMS = new Set(['vne','auw','cg','kts','kph','mph','psi','bar','dan','ply','tow','aft','rig','arc','tps']);
+
 const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that','have','from','they',
   'should','could','would','about','there','their','been','does','glider','gliders','vintage','archive',
   'please','need','know','tell','used','using','into','over','some','also','than','then','them','will',
@@ -236,7 +240,7 @@ async function searchTNS(query) {
   const index = await loadTnsIndex();
   const raw = query.toLowerCase().match(/[a-z0-9][a-z0-9.\-]{1,}/g) || [];
   // keep words of 4+ chars, plus short type designators containing a digit (k8, ka6, t21, ls4)
-  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w))) && !TNS_STOPWORDS.has(w)))];
+  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w)) || AVIATION_SHORT_TERMS.has(w)) && !TNS_STOPWORDS.has(w)))];
   if (words.length === 0) return [];
 
   const results = [];
@@ -273,7 +277,7 @@ async function loadReferenceIndex() {
 async function searchReference(query) {
   const index = await loadReferenceIndex();
   const raw = query.toLowerCase().match(/[a-z0-9][a-z0-9.\-]{1,}/g) || [];
-  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w))) && !TNS_STOPWORDS.has(w)))];
+  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w)) || AVIATION_SHORT_TERMS.has(w)) && !TNS_STOPWORDS.has(w)))];
   if (words.length === 0) return [];
 
   const results = [];
@@ -307,7 +311,7 @@ async function searchReference(query) {
 async function searchScannedTNS(query) {
   // Search all decade indexes in parallel, merge and rank results
   const raw = query.toLowerCase().match(/[a-z0-9][a-z0-9.\-]{1,}/g) || [];
-  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w))) && !TNS_STOPWORDS.has(w)))];
+  const words = [...new Set(raw.filter(w => (w.length >= 4 || (w.length >= 2 && /\d/.test(w)) || AVIATION_SHORT_TERMS.has(w)) && !TNS_STOPWORDS.has(w)))];
   if (words.length === 0) return [];
 
   const allResults = [];
