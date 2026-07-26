@@ -264,9 +264,9 @@ async function searchTNS(query) {
 
 async function loadReferenceIndex() {
   if (referenceIndexCache) return referenceIndexCache;
-  const res = await githubApi('GET', LOG_REPO, REFERENCE_INDEX_PATH);
-  if (res.status !== 200 || !res.json.content) throw new Error('Reference index fetch failed: ' + res.status);
-  referenceIndexCache = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
+  const res = await githubApiRaw(LOG_REPO, REFERENCE_INDEX_PATH);
+  if (res.status !== 200 || !res.body) throw new Error('Reference index fetch failed: ' + res.status);
+  referenceIndexCache = JSON.parse(res.body);
   return referenceIndexCache;
 }
 
@@ -369,6 +369,32 @@ function githubApi(method, repo, path, bodyObj) {
     });
     req.on('error', reject);
     if (body) req.write(body);
+    req.end();
+  });
+}
+
+// Raw-content fetch: the JSON contents API only inlines base64 for files < 1MB.
+// For larger files (reference_fulltext.json is ~14MB) the raw media type must be
+// used — supported by the contents endpoint up to 100MB. (Fix 26/7/26: reference
+// search had been silently failing since the index crossed 1MB.)
+function githubApiRaw(repo, path) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.github.com',
+      path: `/repos/${repo}/contents/${path}`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'thecast-archivist',
+        'Accept': 'application/vnd.github.raw',
+        ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
+      }
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on('error', reject);
     req.end();
   });
 }
