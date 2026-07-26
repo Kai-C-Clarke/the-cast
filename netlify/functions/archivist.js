@@ -232,9 +232,10 @@ const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that
 
 async function loadTnsIndex() {
   if (tnsIndexCache) return tnsIndexCache;
-  const res = await githubApi('GET', LOG_REPO, TNS_INDEX_PATH);
-  if (res.status !== 200 || !res.json.content) throw new Error('TNS index fetch failed: ' + res.status);
-  tnsIndexCache = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
+  // Raw fetch: immune to the >1MB content:'' trap (same fix as loadReferenceIndex 26/7/26)
+  const res = await githubApiRaw(LOG_REPO, TNS_INDEX_PATH);
+  if (res.status !== 200 || !res.body) throw new Error('TNS index fetch failed: ' + res.status);
+  tnsIndexCache = JSON.parse(res.body);
   return tnsIndexCache;
 }
 
@@ -321,9 +322,12 @@ async function searchScannedTNS(query) {
   await Promise.all(Object.entries(TNS_DECADE_PATHS).map(async ([decade, path]) => {
     try {
       if (!tnsDecadeCache[decade]) {
-        const res = await githubApi('GET', LOG_REPO, path);
-        if (res.status !== 200 || !res.json.content) return;
-        tnsDecadeCache[decade] = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
+        // Raw fetch: 1980s (3.2MB), 1990s (3.9MB), 2000s (1.9MB) exceed the 1MB
+        // content:'' JSON-API limit — the old path silently returned nothing for
+        // those three decades (confirmed dead 26/7/26, same trap as reference index)
+        const res = await githubApiRaw(LOG_REPO, path);
+        if (res.status !== 200 || !res.body) return;
+        tnsDecadeCache[decade] = JSON.parse(res.body);
       }
       const index = tnsDecadeCache[decade];
       for (const entry of index.entries) {
@@ -530,9 +534,14 @@ exports.handler = async function(event, context) {
           const rawBuffer = await fetchRawUrl(meta.download_url);
           fetchedText = rawBuffer.toString('utf8');
         }
+        let docText = fetchedText.slice(0, MAX_CHARS);
+        if (fetchedText.length > MAX_CHARS) {
+          docText += `\n\n[DOCUMENT TRUNCATED at ${MAX_CHARS} characters — ${fetchedText.length - MAX_CHARS} characters beyond this point were not loaded. If the answer may lie in the unloaded portion, say so plainly rather than answering as if the document were complete.]`;
+          console.log(`[archivist] TRUNCATED ${doc.label}: ${fetchedText.length} chars -> ${MAX_CHARS}`);
+        }
         docContent.push({
           type: 'text',
-          text: `[Archive document: ${doc.label}]\n\n${fetchedText.slice(0, MAX_CHARS)}`,
+          text: `[Archive document: ${doc.label}]\n\n${docText}`,
           cache_control: { type: 'ephemeral' }
         });
         fetchedLabels.push(doc.label);
