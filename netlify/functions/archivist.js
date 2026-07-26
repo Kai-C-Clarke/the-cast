@@ -223,7 +223,7 @@ const tnsDecadeCache = {};
 
 // Short aviation terms that must survive the 4+ char keyword filter (fix 26/7/26:
 // "VNE of the Bocian" searched on "bocian" alone, so table lines were never quoted)
-const AVIATION_SHORT_TERMS = new Set(['vne','auw','cg','kts','kph','mph','psi','bar','dan','ply','tow','aft','rig','arc','tps']);
+const AVIATION_SHORT_TERMS = new Set(['vne','auw','cg','kts','kph','mph','psi','bar','dan','ply','tow','aft','rig','arc','tns','tps']);
 
 const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that','have','from','they',
   'should','could','would','about','there','their','been','does','glider','gliders','vintage','archive',
@@ -289,7 +289,13 @@ async function searchReference(query) {
     const hits = words.filter(w => text.includes(w));
     if (hits.length === 0) continue;
     if (hits.length < Math.min(2, words.length)) continue;
-    const score = hits.length;
+    // Aircraft-type match is worth more than a generic word hit: a query naming a
+    // type must rank that type's records above documents that merely share common
+    // words ("covering", "repair"). Fix 26/7/26: "VNE of the Bocian, any TNS
+    // covering it?" buried wb-bocian under fabric documents matched on "covering".
+    const types = (entry.aircraft_types || []).map(t => String(t).toLowerCase());
+    const typeHits = words.filter(w => types.some(t => t.includes(w))).length;
+    const score = hits.length + typeHits * 3;
     const lines = entry.text.split('\n');
     const snips = lines
       .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length, d: /\d/.test(l) ? 1 : 0 }))
