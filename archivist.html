@@ -595,14 +595,26 @@ function scrollBottom() {
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
 }
 
-function addMessage(role, text, sources) {
+function addMessage(role, text, sources, sourceDetails) {
   const div = document.createElement('div');
   div.className = `message ${role}`;
 
   if (role === 'assistant') {
     div.innerHTML = text.replace(/\n/g, '<br>');
 
-    if (sources && sources.length > 0) {
+    if (sourceDetails && sourceDetails.length > 0) {
+      const src = document.createElement('div');
+      src.className = 'source-line';
+      const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      src.innerHTML = '<strong>Archive sources consulted:</strong><br>' +
+        sourceDetails.map(s => {
+          let line = `<span>› ${esc(s.label)}`;
+          if (s.url) line += ` — <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.urlName || 'authoritative copy')} ↗</a>`;
+          else line += ` <em>(held in the Archive — see caveats above for the definitive source)</em>`;
+          return line + '</span>';
+        }).join('<br>');
+      div.appendChild(src);
+    } else if (sources && sources.length > 0) {
       const src = document.createElement('div');
       src.className = 'source-line';
       src.innerHTML = '<strong>Archive sources consulted:</strong><br>' +
@@ -725,7 +737,7 @@ async function sendMessage() {
     if (data.error) {
       addMessage('system-note', 'Something went wrong in the archive room: ' + data.error);
     } else {
-      addMessage('assistant', data.reply, data.sources);
+      addMessage('assistant', data.reply, data.sources, data.sourceDetails);
       conversationHistory.push({ role: 'assistant', content: data.reply });
     }
   } catch (e) {
