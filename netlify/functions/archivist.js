@@ -385,6 +385,41 @@ async function searchScannedTNS(query) {
 
 const LOG_REPO = 'Kai-C-Clarke/glider-workshop';
 
+// ── Authoritative source links (sources panel, 28/7/26) ──────────────────────
+// JRS ruling: BGA documents are publicly released — linking is a service, and the
+// BGA copy is the CURRENT revision. BGA URLs confirmed via search/production use;
+// FAA/Ceconite/West System verified 200 on 28/7/26. NEVER re-host PDFs here; the
+// remaining third-party works (Simons, Hoy course, book scans) stay archive-only.
+const SOURCE_LINK_RULES = [
+  { test: (l, p) => /^AMP[ -]|Airworthiness .*Maintenance Procedure/i.test(l) || p.includes('/AMP/') || l.includes('CS-STAN'),
+    url: 'https://members.gliding.co.uk/airworthiness-2/airworthiness-and-maintenance-procedures/',
+    name: 'BGA AMP page — current revisions' },
+  { test: (l, p) => l.includes('Standard Repairs'),
+    url: 'https://members.gliding.co.uk/library/standard-repairs-to-gliders/',
+    name: 'BGA library — Standard Repairs to Gliders' },
+  { test: (l, p) => l.includes('Compendium'),
+    url: 'https://members.gliding.co.uk/airworthiness-2/airworthiness-directives/',
+    name: 'BGA — Airworthiness Instructions and Compendium' },
+  { test: (l, p) => /wb-|Datasheets?|Weighing Periodicity/i.test(l),
+    url: 'https://members.gliding.co.uk/library/airworthiness/',
+    name: 'BGA library — airworthiness documents (datasheets and compendium)' },
+  { test: (l, p) => /AC ?43|ANC-?1[89]/i.test(l),
+    url: 'https://www.faa.gov/regulations_policies/advisory_circulars/index.cfm/go/document.information/documentID/99861',
+    name: 'FAA — AC 43.13-1B (public domain)' },
+  { test: (l, p) => l.includes('Ceconite'),
+    url: 'https://www.ceconite.com/',
+    name: 'Ceconite — manufacturer site' },
+  { test: (l, p) => /West System|Gougeon/i.test(l),
+    url: 'https://www.westsystem.com/instruction-2/user-manual-product-guide/',
+    name: 'West System — user manual and product guide' },
+];
+function sourceLink(label, path) {
+  for (const r of SOURCE_LINK_RULES) {
+    try { if (r.test(label || '', path || '')) return { url: r.url, name: r.name }; } catch (e) {}
+  }
+  return null;
+}
+
 function githubApi(method, repo, path, bodyObj) {
   return new Promise((resolve, reject) => {
     const body = bodyObj ? JSON.stringify(bodyObj) : null;
@@ -670,11 +705,35 @@ exports.handler = async function(event, context) {
     const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
     console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
 
+    // Full provenance for the sources panel. Previously `sources` listed only
+    // full-document fetches — search-hit snippets that supplied figures were
+    // invisible (the corrected SHK-1 answer cited wb-shk-1 yet sources showed
+    // only the Compendium). Every consulted material now appears, with an
+    // authoritative link where a public source exists.
+    const sourceDetails = [];
+    const seen = new Set();
+    const addSource = (label, kind, link) => {
+      if (!label || seen.has(label)) return;
+      seen.add(label);
+      sourceDetails.push({ label, kind, url: link ? link.url : null, urlName: link ? link.name : null });
+    };
+    relevantDocs.forEach(doc => {
+      if (fetchedLabels.includes(doc.label)) addSource(doc.label, 'document', sourceLink(doc.label, doc.path));
+    });
+    referenceResults.forEach(r => addSource(r.label, 'search', sourceLink(r.label, r.source || '')));
+    tnsResults.forEach(t => addSource(t.label, 'tns', t.url
+      ? { url: t.url, name: 'BGA TNS library — authoritative current copy' }
+      : { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library' }));
+    scannedTnsResults.forEach(s => addSource(`${s.label} (${s.decade}, scanned)`, 'tns-scan',
+      { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library — read the authoritative copy' }));
+
+    const sourceLabels = sourceDetails.map(s => s.label);
+
     // Log the exchange for weekly review (disclosed on page). Time-boxed and
     // failure-tolerant: a slow or failed log write must never delay the answer.
     try {
       await Promise.race([
-        logConversation(latestQuery, reply, fetchedLabels, failedLabels),
+        logConversation(latestQuery, reply, sourceLabels, failedLabels),
         new Promise(resolve => setTimeout(resolve, 4000))
       ]);
     } catch (e) {
@@ -684,7 +743,7 @@ exports.handler = async function(event, context) {
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ reply, sources: fetchedLabels })
+      body: JSON.stringify({ reply, sources: sourceLabels, sourceDetails })
     };
 
   } catch (err) {
