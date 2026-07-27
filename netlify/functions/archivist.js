@@ -403,7 +403,7 @@ const SOURCE_LINK_RULES = [
   { test: (l, p) => /wb-|Datasheets?|Weighing Periodicity/i.test(l),
     url: 'https://members.gliding.co.uk/library/airworthiness/',
     name: 'BGA library — airworthiness documents (datasheets and compendium)' },
-  { test: (l, p) => /AC ?43|ANC-?1[89]/i.test(l),
+  { test: (l, p) => /AC ?43|ANC-?1[89]|Hardware, Control Cables/i.test(l) || p.includes('ac43'),
     url: 'https://www.faa.gov/regulations_policies/advisory_circulars/index.cfm/go/document.information/documentID/99861',
     name: 'FAA — AC 43.13-1B (public domain)' },
   { test: (l, p) => l.includes('Ceconite'),
