@@ -23,6 +23,8 @@ When citing any BGA Airworthiness Maintenance Procedure (AMP), always note that 
 
 Do not speculate beyond what the documents contain. Do not use exclamation marks. Refer to the collection as "the Glider Workshop Archive" or simply "the Archive."
 
+NUMERIC LIMITATIONS RULE — absolute. Operating figures (VNE and other speeds, weights, C of G limits, control deflections, pressures, weak link values) may be stated ONLY if the figure appears in archive material provided in this conversation. Never supply a figure from memory, however confident you are. Never name or cite an archive record that was not actually provided or returned by search in this conversation — citing a record you have not been shown is fabrication. If the search returns nothing that answers the question, say plainly that the Archive search did not return the relevant document this time, suggest the user rephrase or try again, and point to the authoritative source (Flight Manual, BGA library). An honest "not retrieved" is always acceptable; a guessed figure can overstress an aircraft.
+
 When TNS search results are provided to you, they come from an index of BGA Technical News Sheets. If a result is relevant to the question, tell the user the topic is covered in that TNS and give them the BGA library link so they can read the authoritative current copy. Quote only the short matched lines provided — the full TNS text is not in the Archive and you have not read it. The TNS index covers born-digital issues from roughly 2008 to the present; earlier sheets back to 1975 exist and can be browsed at members.gliding.co.uk/library/tns/.
 
 If the user writes in German, French, or Spanish, respond naturally in that language. Note that archive documents are predominantly in English, so technical terms and source citations will be in English. You may introduce yourself in the user's language if greeted in that language.`;
@@ -225,6 +227,18 @@ const tnsDecadeCache = {};
 // "VNE of the Bocian" searched on "bocian" alone, so table lines were never quoted)
 const AVIATION_SHORT_TERMS = new Set(['vne','auw','cg','kts','kph','mph','psi','bar','dan','ply','tow','aft','rig','arc','tps']);
 
+// Type designators are written every way: SHK-1 / SHK 1 / SHK1, Ka-6 / Ka6 / Ka 6.
+// A hyphenated query word matches text containing any spelling variant.
+// (Fix 27/7/26: "VNE of a SHK-1?" — record text says "SHK 1", so "shk-1" matched
+// nothing, the 2-hit gate returned zero results, and the model fabricated a citation.)
+function wordVariants(w) {
+  if (!w.includes('-')) return [w];
+  return [w, w.replace(/-/g, ''), w.replace(/-/g, ' ')];
+}
+function textMatches(text, w) {
+  return wordVariants(w).some(v => text.includes(v));
+}
+
 const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that','have','from','they',
   'should','could','would','about','there','their','been','does','glider','gliders','vintage','archive',
   'please','need','know','tell','used','using','into','over','some','also','than','then','them','will',
@@ -249,7 +263,7 @@ async function searchTNS(query) {
   const results = [];
   for (const entry of index.entries) {
     const text = entry.text.toLowerCase();
-    const hits = words.filter(w => text.includes(w));
+    const hits = words.filter(w => textMatches(text, w));
     if (hits.length === 0) continue;
     // require 2+ distinct keyword hits unless the query only offered one keyword
     if (hits.length < Math.min(2, words.length)) continue;
@@ -257,7 +271,7 @@ async function searchTNS(query) {
     // snippets: lines containing the most keywords
     const lines = entry.text.split('\n');
     const snips = lines
-      .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length }))
+      .map(l => ({ l, n: hits.filter(w => textMatches(l.toLowerCase(), w)).length }))
       .filter(x => x.n > 0)
       .sort((a, b) => b.n - a.n)
       .slice(0, 2)
@@ -291,23 +305,24 @@ async function searchReference(query) {
     // manuals (26/7/26: wb-bocian lost to a dozen TNS records). One class, one route.
     if ((entry.label || '').startsWith('BGA Technical News Sheets') || (entry.source || '').includes('BGA-TNS')) continue;
     const text = entry.text.toLowerCase();
-    const hits = words.filter(w => text.includes(w));
-    if (hits.length === 0) continue;
-    if (hits.length < Math.min(2, words.length)) continue;
+    const labelLower = (entry.label || '').toLowerCase();
+    const hits = words.filter(w => textMatches(text, w));
+    const labelHits = words.filter(w => textMatches(labelLower, w)).length;
+    // Gate on distinct words matched anywhere (text OR label): a type designator
+    // often lives only in the label while the body says "SHK 1" in a table
+    const matchedWords = words.filter(w => textMatches(text, w) || textMatches(labelLower, w));
+    if (matchedWords.length === 0) continue;
+    if (matchedWords.length < Math.min(2, words.length)) continue;
     // Aircraft-type match is worth more than a generic word hit: a query naming a
     // type must rank that type's records above documents that merely share common
     // words ("covering", "repair"). Fix 26/7/26: "VNE of the Bocian, any TNS
     // covering it?" buried wb-bocian under fabric documents matched on "covering".
     const types = (entry.aircraft_types || []).map(t => String(t).toLowerCase());
-    const typeHits = words.filter(w => types.some(t => t.includes(w))).length;
-    // Label match is equally strong: wb- datasheet records carry the type name in
-    // the label but have no aircraft_types field (corpus-side fix queued 26/7/26)
-    const labelLower = (entry.label || '').toLowerCase();
-    const labelHits = words.filter(w => labelLower.includes(w)).length;
+    const typeHits = words.filter(w => types.some(t => textMatches(t, w))).length;
     const score = hits.length + (typeHits + labelHits) * 3;
     const lines = entry.text.split('\n');
     const snips = lines
-      .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length, d: /\d/.test(l) ? 1 : 0 }))
+      .map(l => ({ l, n: hits.filter(w => textMatches(l.toLowerCase(), w)).length, d: /\d/.test(l) ? 1 : 0 }))
       .filter(x => x.n > 0)
       .sort((a, b) => (b.n - a.n) || (b.d - a.d))
       .slice(0, 3)
@@ -347,11 +362,11 @@ async function searchScannedTNS(query) {
       const index = tnsDecadeCache[decade];
       for (const entry of index.entries) {
         const text = entry.text.toLowerCase();
-        const hits = words.filter(w => text.includes(w));
+        const hits = words.filter(w => textMatches(text, w));
         if (hits.length < Math.min(2, words.length)) continue;
         const lines = entry.text.split('\n');
         const snips = lines
-          .map(l => ({ l, n: hits.filter(w => l.toLowerCase().includes(w)).length }))
+          .map(l => ({ l, n: hits.filter(w => textMatches(l.toLowerCase(), w)).length }))
           .filter(x => x.n > 0)
           .sort((a, b) => b.n - a.n)
           .slice(0, 2)
