@@ -142,7 +142,6 @@ const FILE_INDEX = [
   { keywords: ['ac43','faa','wood structure','aircraft wood','federal aviation','timber','spruce','spar repair'], path: 'wood_construction/ac43_chapters/14_chapter_1_wood_structure.txt', label: 'AC43.13-1B — Wood Structure (full chapter)' },
   { keywords: ['anc18','anc-18','design wood','aircraft structure design','allowable stress','wood species','strength','modulus'], path: 'wood_construction/anc18_chapters/part_01.txt', label: 'ANC-18 — Design of Wood Aircraft Structures (Part 1)' },
   { keywords: ['anc19','anc-19','wood inspection','fabrication','defects','checks','grain','knots','slope of grain'], path: 'wood_construction/anc19_chapters/part_01.txt', label: 'ANC-19 — Wood Aircraft Inspection and Fabrication (Part 1)' },
-  { keywords: ['slingsby','martin simons','t21','t31','t49','t51','skylark','prefect','capstan','swallow','type history','design history'], path: 'gliding_history_and_literature/slingsby_chapters/part_01.txt', label: 'Slingsby Sailplanes — Martin Simons (Part 1)' },
   { keywords: ['grounding','bonding','static','lightning','electrical bonding','static discharge','earthing','bonding strap','bonding jumper','metallic bonding','faraday','precipitation static','p-static','shielding','emi'], path: 'general_airworthiness/ac43_ch11_section15_grounding_bonding.txt', label: 'AC43.13-1B Chapter 11 — Electrical Systems, Grounding and Bonding' },
   { keywords: ['bonding','grounding','wooden glider','vintage bonding','static wood','wood conductor','p-static radio','radio installation','transponder installation','retrofit radio','wood moisture','static discharge wood'], path: 'general_airworthiness/electrical_bonding_vintage_wooden_gliders_note_2026.txt', label: 'Electrical Bonding in Vintage Wooden Gliders — Why It Is Absent (2026)' },
   { keywords: ['piggott','derek piggott','cumulonimbus','thunderstorm','lightning strike','skylark','lasham','altitude record','electric shock','control column shock','cloud flying','cb','hypoxia','ice controls'], path: 'gliding_history_and_literature/derek_piggott_cumulonimbus_1955_case_study.txt', label: 'Derek Piggott — Cumulonimbus Encounter 1955 (Lightning Case Study)' },
@@ -150,9 +149,10 @@ const FILE_INDEX = [
 
   // History and literature
   { keywords: ['kronfeld','soaring','thermal','history','wave','ridge','gliding'], path: 'gliding_history_and_literature/kronfeld_chapters/part_01.txt', label: 'Kronfeld — On Gliding and Soaring (Part 1)' },
-  { keywords: ['wally','kahn','bold','history','vintage pilot'], path: 'gliding_history_and_literature/wally_kahn_chapters/part_01.txt', label: 'Wally Kahn — A Glider Pilot Bold (Part 1)' },
-  { keywords: ['ann','welch','silent','flight','1939','pre-war'], path: 'gliding_history_and_literature/ann_welch_chapters/part_01.txt', label: 'Ann Welch — Silent Flight (1939)' },
-  { keywords: ['slingsby','martin','simons','sailplane','type history','t21','t49'], path: 'gliding_history_and_literature/slingsby_chapters/part_01.txt', label: 'Martin Simons — Slingsby Sailplanes' },
+  // Wally Kahn (A Glider Pilot Bold), Ann Welch (Silent Flight), and Martin Simons (Slingsby Sailplanes)
+  // full-fetch entries removed 1 Aug 2026: all three are under active copyright (Kahn d.2015, Welch d.2002,
+  // Simons d.2024) unlike Kronfeld (d.1948, genuinely PD). Source files remain in the private repo for future
+  // snippet-only retrieval once a proper bounded-quote tier is built.
 
   // AMP Manual
   { keywords: ['arc','arc renewal','part 21','certificate of airworthiness renewal','annual'], path: 'general_airworthiness/AMP/amp_1-1_arc_renewal_part_21.txt', label: 'AMP 1-1 — ARC Renewal (Part 21)' },
