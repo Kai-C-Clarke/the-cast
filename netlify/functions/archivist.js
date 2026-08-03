@@ -244,6 +244,135 @@ const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that
   'please','need','know','tell','used','using','into','over','some','also','than','then','them','will',
   'aircraft','sailplane','wooden','wood','repair','repairs','inspection','inspect','check','question']);
 
+// --- Wally Kahn / BGA eBook Collection (wk-) ---
+// Permission granted by Pete Stratten (BGA CEO), 1/8/26. Deliberately NOT a
+// full-document-fetch source (see FILE_INDEX pattern used elsewhere): snippet-
+// only retrieval, mandatory paraphrase, one short attributed quote max, and a
+// hard checksum gate on any quote before it reaches the user. See
+// gliding_history_and_literature/wally_kahn_collection/README.md and
+// PAGE_MAPPING_STATUS.md in vintage-glider-knowledge-base for full provenance
+// and the printed-page-number caveat (cite pdf_page ONLY -- printed_page data
+// in that repo is flagged unverified, do not use).
+const WK_REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
+const WK_INDEX_PATH = 'gliding_history_and_literature/wally_kahn_collection/search_index/index.json';
+const WK_COLLECTION_DIR = 'gliding_history_and_literature/wally_kahn_collection';
+const WK_LANDING_PAGE = 'https://www.lakesgc.co.uk/mainwebpages/Wally%20Kahn%20Book%20Collection.htm';
+
+let wkIndexCache = null; // survives warm invocations
+const wkBookCache = {};  // survives warm invocations, per-book full text
+
+const WK_STOPWORDS = new Set(['the','a','an','and','or','but','if','then','else','when','at','by','for',
+  'with','about','against','between','into','through','during','before','after','above','below','to',
+  'from','up','down','in','out','on','off','over','under','again','further','once','here','there','all',
+  'any','both','each','few','more','most','other','some','such','no','nor','not','only','own','same','so',
+  'than','too','very','can','will','just','now','this','that','these','those','is','are','was','were',
+  'be','been','being','have','has','had','do','does','did']);
+
+function wkTokenize(query) {
+  const raw = (query.toLowerCase().match(/[a-z]{3,}/g) || []);
+  return [...new Set(raw.filter(w => !WK_STOPWORDS.has(w)))];
+}
+
+async function loadWkIndex() {
+  if (wkIndexCache) return wkIndexCache;
+  const res = await githubApiRaw(WK_REPO, WK_INDEX_PATH);
+  if (res.status !== 200 || !res.body) throw new Error('wk- index fetch failed: ' + res.status);
+  wkIndexCache = JSON.parse(res.body);
+  return wkIndexCache;
+}
+
+async function loadWkBook(slug) {
+  if (wkBookCache[slug]) return wkBookCache[slug];
+  const res = await githubApiRaw(WK_REPO, `${WK_COLLECTION_DIR}/extracted_text/${slug}.json`);
+  if (res.status !== 200 || !res.body) throw new Error(`wk- book fetch failed for ${slug}: ${res.status}`);
+  const data = JSON.parse(res.body);
+  wkBookCache[slug] = data;
+  return data;
+}
+
+// Two-stage retrieval (Fable, 1-3/8/26 design): the index is small enough to load
+// whole and cache; a query scores candidate (book, page) pairs by term overlap,
+// then only the top few candidates' actual page text gets fetched, with a +/-1
+// page window for context. Full books are never loaded wholesale for a query.
+async function searchWkCollection(query, maxCandidates = 4) {
+  const index = await loadWkIndex();
+  const words = wkTokenize(query);
+  if (words.length === 0) return [];
+
+  const pageScores = new Map();
+  for (const word of words) {
+    const postings = index.terms[word];
+    if (!postings) continue;
+    for (const encoded of postings) {
+      const bookID = Math.floor(encoded / 10000);
+      const pdfPage = encoded % 10000;
+      const key = `${bookID}:${pdfPage}`;
+      const existing = pageScores.get(key);
+      if (existing) existing.score += 1;
+      else pageScores.set(key, { score: 1, bookID, pdfPage });
+    }
+  }
+  if (pageScores.size === 0) return [];
+
+  const minWords = Math.min(2, words.length);
+  const candidates = [...pageScores.values()]
+    .filter(c => c.score >= minWords)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxCandidates);
+
+  const results = [];
+  for (const c of candidates) {
+    const slug = index.book_ids[String(c.bookID)];
+    if (!slug) continue;
+    try {
+      const book = await loadWkBook(slug);
+      const windowPages = book.pages.filter(p => Math.abs(p.pdf_page - c.pdfPage) <= 1);
+      const windowText = windowPages.map(p => p.text).join('\n\n').slice(0, 3000);
+      results.push({ slug, pdf_page: c.pdfPage, source_url: book.source_url, score: c.score, window_text: windowText });
+    } catch (e) {
+      console.log(`[wk-search] skip ${slug}: ${e.message}`);
+    }
+  }
+  return results;
+}
+
+// --- Checksum gate: hard, not telemetry (Fable, 2/8/26) ---
+// A quote is only as trustworthy as the mapping used to cite it. printed_page
+// mapping is known unreliable right now (see PAGE_MAPPING_STATUS.md), so this
+// verifies the quote's TEXT against the actual fetched window -- independent
+// of whatever page number gets shown -- catching hallucinated/mangled quotes
+// regardless of the page-numbering issue.
+function wkNormalize(s) {
+  return s.toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/-\s*\n\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function wkVerifyQuote(quote, wkResults) {
+  const normQuote = wkNormalize(quote);
+  if (normQuote.length < 5) return true;
+  return wkResults.some(r => wkNormalize(r.window_text).includes(normQuote));
+}
+
+function wkApplyChecksumGate(reply, wkResults) {
+  if (!wkResults || wkResults.length === 0) return reply;
+  const quoteRe = /["\u201c]([^"\u201d]{15,300})["\u201d]/g;
+  let result = reply;
+  let match;
+  const toReplace = [];
+  while ((match = quoteRe.exec(reply)) !== null) {
+    if (!wkVerifyQuote(match[1], wkResults)) toReplace.push(match[0]);
+  }
+  for (const bad of toReplace) {
+    console.log(`[wk-checksum] REJECTED unverified quote: "${bad.slice(0, 80)}..."`);
+    result = result.replace(bad, '[quotation removed — could not be verified against the source text]');
+  }
+  return result;
+}
+
 async function loadTnsIndex() {
   if (tnsIndexCache) return tnsIndexCache;
   // Raw fetch: immune to the >1MB content:'' trap (same fix as loadReferenceIndex 26/7/26)
@@ -571,6 +700,7 @@ exports.handler = async function(event, context) {
     let tnsResults = [];
     let referenceResults = [];
     let scannedTnsResults = [];
+    let wkResults = [];
     await Promise.all([
       ...relevantDocs.map(async (doc) => {
       try {
@@ -626,7 +756,11 @@ exports.handler = async function(event, context) {
       Promise.race([
         searchScannedTNS(routingQuery).then(r => { scannedTnsResults = r; }),
         new Promise(resolve => setTimeout(resolve, 12000))
-      ]).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`))
+      ]).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`)),
+      Promise.race([
+        searchWkCollection(routingQuery).then(r => { wkResults = r; }),
+        new Promise(resolve => setTimeout(resolve, 12000))
+      ]).catch(e => console.log(`[archivist] wk- collection search skipped: ${e.message}`))
     ]);
 
     if (tnsResults.length > 0) {
@@ -638,6 +772,9 @@ exports.handler = async function(event, context) {
 
     if (scannedTnsResults.length > 0) {
       console.log(`[archivist] Scanned TNS hits: ${scannedTnsResults.map(r => r.label).join(', ')}`);
+    }
+    if (wkResults.length > 0) {
+      console.log(`[archivist] wk- hits: ${wkResults.map(r => `${r.slug}#${r.pdf_page}`).join(', ')}`);
     }
 
     const userContent = [];
@@ -671,6 +808,17 @@ exports.handler = async function(event, context) {
         `\nNote: these are older scanned documents — OCR may have minor errors. Use for guidance and topic identification, not verbatim quotes.`
       : '';
 
+    const wkNote = wkResults.length > 0
+      ? `\n\nWally Kahn / BGA eBook Collection search results (vintage gliding books, used with BGA permission — a private grounding store, NOT for reproduction):\n` +
+        wkResults.map(r => `- "${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')}", scan page ${r.pdf_page}\n  text: ${r.window_text.slice(0, 500).replace(/\n+/g, ' ')}...`).join('\n') +
+        `\n\nSTRICT RULES for using this material:\n` +
+        `1. Summarise and paraphrase in your own words. This is the primary way to use this material.\n` +
+        `2. At most ONE direct quotation, maximum 25 words, in quotation marks, clearly attributed to the book by name.\n` +
+        `3. Cite the location as "scan page ${'{N}'}" using the pdf_page number given above — NEVER state or infer a printed/book page number. This collection's printed page numbers are not yet verified and must not be presented to the reader.\n` +
+        `4. Do not reproduce more of the text than needed to answer the question.\n` +
+        `5. Tell the reader this comes from the Wally Kahn / BGA eBook Collection and that they can find the original at the source link provided in this system's sources panel — do not construct or guess a link yourself.`
+      : '';
+
     if (docContent.length > 0) {
       userContent.push(...docContent);
       let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
@@ -680,12 +828,13 @@ exports.handler = async function(event, context) {
       contextNote += tnsNote;
       contextNote += referenceNote;
       contextNote += scannedTnsNote;
+      contextNote += wkNote;
       contextNote += `\n\nUser's question: ${latestQuery}`;
       userContent.push({ type: 'text', text: contextNote });
     } else if (failedLabels.length > 0) {
-      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote}${referenceNote}${scannedTnsNote} User's question: ${latestQuery}` });
+      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote}${referenceNote}${scannedTnsNote}${wkNote} User's question: ${latestQuery}` });
     } else {
-      userContent.push({ type: 'text', text: (tnsNote || referenceNote || scannedTnsNote) ? `${tnsNote}${referenceNote}${scannedTnsNote}\n\nUser's question: ${latestQuery}` : latestQuery });
+      userContent.push({ type: 'text', text: (tnsNote || referenceNote || scannedTnsNote || wkNote) ? `${tnsNote}${referenceNote}${scannedTnsNote}${wkNote}\n\nUser's question: ${latestQuery}` : latestQuery });
     }
 
     const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
@@ -702,7 +851,8 @@ exports.handler = async function(event, context) {
       throw new Error('Anthropic error: ' + JSON.stringify(response));
     }
 
-    const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    let reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    reply = wkApplyChecksumGate(reply, wkResults);
     console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
 
     // Full provenance for the sources panel. Previously `sources` listed only
@@ -726,6 +876,10 @@ exports.handler = async function(event, context) {
       : { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library' }));
     scannedTnsResults.forEach(s => addSource(`${s.label} (${s.decade}, scanned)`, 'tns-scan',
       { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library — read the authoritative copy' }));
+    wkResults.forEach(r => addSource(
+      `${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')} (Wally Kahn / BGA eBook Collection)`,
+      'wk-collection',
+      { url: WK_LANDING_PAGE, name: 'Wally Kahn / BGA eBook Collection' }));
 
     const sourceLabels = sourceDetails.map(s => s.label);
 
