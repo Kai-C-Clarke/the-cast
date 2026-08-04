@@ -261,6 +261,34 @@ const WK_LANDING_PAGE = 'https://www.lakesgc.co.uk/mainwebpages/Wally%20Kahn%20B
 let wkIndexCache = null; // survives warm invocations
 const wkBookCache = {};  // survives warm invocations, per-book full text
 
+// --- Rate limiting (Fable, 3/8/26 pre-launch review) ---
+// In-memory, per warm Netlify instance -- not perfectly accurate across
+// multiple concurrent cold instances under a real traffic spike, but a
+// genuine deterrent against casual scraping/abuse, which is what this is
+// actually protecting against (there's no login, no cost-per-query billing
+// risk beyond Anthropic API spend, and the underlying content is already
+// publicly summarised elsewhere -- this isn't a security boundary, it's a
+// courtesy limit). A proper distributed limiter is a fair upgrade later if
+// traffic ever suggests this isn't enough.
+const rateLimitBuckets = new Map(); // ip -> array of request timestamps (ms)
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_MAX = 20; // requests per window per IP
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(ip) || [];
+  const recent = bucket.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+  recent.push(now);
+  rateLimitBuckets.set(ip, recent);
+  // Occasional cleanup so the map doesn't grow unbounded across a long-lived warm instance
+  if (rateLimitBuckets.size > 500) {
+    for (const [key, times] of rateLimitBuckets) {
+      if (times.every(t => now - t > RATE_LIMIT_WINDOW_MS)) rateLimitBuckets.delete(key);
+    }
+  }
+  return recent.length <= RATE_LIMIT_MAX;
+}
+
 const WK_STOPWORDS = new Set(['the','a','an','and','or','but','if','then','else','when','at','by','for',
   'with','about','against','between','into','through','during','before','after','above','below','to',
   'from','up','down','in','out','on','off','over','under','again','further','once','here','there','all',
@@ -351,26 +379,76 @@ function wkNormalize(s) {
     .trim();
 }
 
-function wkVerifyQuote(quote, wkResults) {
+// Tightened per Fable's pre-launch review (3/8/26): verify the quote against the
+// SPECIFIC page it's cited to, not against any fetched candidate in the batch.
+// Without this, a quote could genuinely appear on scan page 46's window while
+// being attributed in the reply to scan page 12 -- same class of problem as
+// quote fabrication, one level up (correct text, wrong claim about where it's
+// from). A quote with no nearby page citation, or one citing a page we didn't
+// actually fetch, fails closed -- it does not get the benefit of the doubt.
+function wkVerifyQuoteAgainstPage(quote, citedPage, wkResults) {
   const normQuote = wkNormalize(quote);
   if (normQuote.length < 5) return true;
-  return wkResults.some(r => wkNormalize(r.window_text).includes(normQuote));
+  if (citedPage == null) return false; // no citation found nearby -- fail closed
+  const match = wkResults.find(r => r.pdf_page === citedPage);
+  if (!match) return false; // cited a page we never fetched -- fail closed
+  return wkNormalize(match.window_text).includes(normQuote);
+}
+
+function wkFindNearbyPageCitation(reply, matchIndex, matchLength) {
+  // Look in a window around the quote (citations can precede or follow it in
+  // natural phrasing) for "scan page N"
+  const windowStart = Math.max(0, matchIndex - 120);
+  const windowEnd = Math.min(reply.length, matchIndex + matchLength + 120);
+  const surrounding = reply.slice(windowStart, windowEnd);
+  const pageMatch = surrounding.match(/scan page\s+(\d+)/i);
+  return pageMatch ? parseInt(pageMatch[1], 10) : null;
+}
+
+// Remove the whole sentence containing a rejected quote, not just the quoted
+// words -- a bare word-swap leaves a grammatically broken fragment around the
+// removal notice (Fable, 3/8/26: "leaves a broken sentence"). Expanding to
+// sentence boundaries means the surrounding text still reads cleanly even
+// with the claim removed.
+function wkStripSentenceContaining(text, matchStart, matchEnd) {
+  let start = matchStart;
+  while (start > 0 && !'.!?\n'.includes(text[start - 1])) start--;
+  let end = matchEnd;
+  while (end < text.length && !'.!?\n'.includes(text[end])) end++;
+  if (end < text.length) end++; // include the terminating punctuation
+  return { start, end };
 }
 
 function wkApplyChecksumGate(reply, wkResults) {
-  if (!wkResults || wkResults.length === 0) return reply;
+  if (!wkResults || wkResults.length === 0) return { reply, flagged: [] };
   const quoteRe = /["\u201c]([^"\u201d]{15,300})["\u201d]/g;
-  let result = reply;
+  const flagged = [];
   let match;
-  const toReplace = [];
+  const spans = [];
   while ((match = quoteRe.exec(reply)) !== null) {
-    if (!wkVerifyQuote(match[1], wkResults)) toReplace.push(match[0]);
+    const citedPage = wkFindNearbyPageCitation(reply, match.index, match[0].length);
+    if (!wkVerifyQuoteAgainstPage(match[1], citedPage, wkResults)) {
+      const span = wkStripSentenceContaining(reply, match.index, match.index + match[0].length);
+      spans.push(span);
+      flagged.push({ quote: match[1].slice(0, 100), citedPage });
+    }
   }
-  for (const bad of toReplace) {
-    console.log(`[wk-checksum] REJECTED unverified quote: "${bad.slice(0, 80)}..."`);
-    result = result.replace(bad, '[quotation removed — could not be verified against the source text]');
+  if (spans.length === 0) return { reply, flagged: [] };
+
+  // Remove flagged spans back-to-front so earlier indices stay valid
+  spans.sort((a, b) => b.start - a.start);
+  let result = reply;
+  for (const { start, end } of spans) {
+    console.log(`[wk-checksum] REJECTED sentence with unverified quote (cited page: ${reply.slice(start,end).match(/scan page\s+\d+/i)?.[0] || 'none'})`);
+    result = result.slice(0, start) + result.slice(end);
   }
-  return result;
+  result = result.replace(/\s{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  if (result.length < 20) {
+    // Stripping the flagged sentence(s) left nothing substantive -- an empty
+    // reply is a worse failure than an honest explanation.
+    result = "I found something that looked relevant in the Wally Kahn / BGA eBook Collection, but I couldn't verify the specific claim against the source text, so I don't want to state it with confidence. You may want to check the collection directly for this one — see the sources panel.";
+  }
+  return { reply: result, flagged };
 }
 
 async function loadTnsIndex() {
@@ -603,7 +681,7 @@ function githubApiRaw(repo, path) {
   });
 }
 
-async function logConversation(question, reply, fetchedLabels, failedLabels) {
+async function logConversation(question, reply, fetchedLabels, failedLabels, wkGateFlags) {
   if (!GITHUB_TOKEN) return;
   const now = new Date();
   const day = now.toISOString().slice(0, 10);
@@ -613,6 +691,10 @@ async function logConversation(question, reply, fetchedLabels, failedLabels) {
   let entry = `\n---\n### ${day} ${time} UTC\n**Q:** ${question}\n\n`;
   entry += `**Sources:** ${fetchedLabels.join('; ') || 'none'}`;
   if (failedLabels.length > 0) entry += ` | FAILED: ${failedLabels.join('; ')}`;
+  if (wkGateFlags && wkGateFlags.length > 0) {
+    entry += `\n**wk- CHECKSUM GATE FIRED:** ` + wkGateFlags.map(f =>
+      `[cited page: ${f.citedPage ?? 'none'}, quote: "${f.quote}"]`).join('; ');
+  }
   entry += `\n\n**A:** ${reply}\n`;
 
   // Two attempts to absorb a concurrent-write SHA conflict
@@ -678,6 +760,16 @@ exports.handler = async function(event, context) {
   }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: CORS_HEADERS, body: 'Method Not Allowed' };
+  }
+
+  const clientIp = event.headers['x-nf-client-connection-ip'] || event.headers['client-ip'] || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    console.log(`[archivist] Rate limit hit: ${clientIp}`);
+    return {
+      statusCode: 429,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: "You've sent quite a few questions in a short time — give it a few minutes and try again. If you're doing something that genuinely needs more, get in touch." })
+    };
   }
 
   try {
@@ -852,7 +944,8 @@ exports.handler = async function(event, context) {
     }
 
     let reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
-    reply = wkApplyChecksumGate(reply, wkResults);
+    const wkGate = wkApplyChecksumGate(reply, wkResults);
+    reply = wkGate.reply;
     console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
 
     // Full provenance for the sources panel. Previously `sources` listed only
@@ -887,7 +980,7 @@ exports.handler = async function(event, context) {
     // failure-tolerant: a slow or failed log write must never delay the answer.
     try {
       await Promise.race([
-        logConversation(latestQuery, reply, sourceLabels, failedLabels),
+        logConversation(latestQuery, reply, sourceLabels, failedLabels, wkGate.flagged),
         new Promise(resolve => setTimeout(resolve, 4000))
       ]);
     } catch (e) {
