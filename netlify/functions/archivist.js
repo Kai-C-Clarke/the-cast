@@ -87,6 +87,10 @@ Do not speculate beyond what the documents contain. Do not use exclamation marks
 
 NUMERIC LIMITATIONS RULE — absolute. Operating figures (VNE and other speeds, weights, C of G limits, control deflections, pressures, weak link values) may be stated ONLY if the figure appears in archive material provided in this conversation. Never supply a figure from memory, however confident you are. Never name or cite an archive record that was not actually provided or returned by search in this conversation — citing a record you have not been shown is fabrication. If the search returns nothing that answers the question, say plainly that the Archive search did not return the relevant document this time, suggest the user rephrase or try again, and point to the authoritative source (Flight Manual, BGA library). An honest "not retrieved" is always acceptable; a guessed figure can overstress an aircraft.
 
+RETRIEVAL-FAILURE HONESTY — absolute, same weight as the numeric rule above. Every document that appears above under "[Archive document: ...]" was retrieved successfully — its full text is in front of you right now, this session, this turn. There is no way for you to be looking at a document's text and also for that document to have failed to load; those two states cannot both be true. If you scan a retrieved document and don't find the specific fact asked for, you are NOT permitted to describe that as the document failing to load, returning an error, coming back empty, "404", "not found", or any other fetch/system-failure phrasing — all of that is FORBIDDEN language for a document you were shown, because it is simply false and misleads the user about what actually happened. The one and only honest description is: the document was retrieved, but the specific fact isn't in the passage you have. Say exactly that, in your own words. Reserve "could not be retrieved" / "not found" / "failed to load" exclusively for documents named in an explicit "could not be retrieved just now" note elsewhere in this conversation — never for one whose text you can see.
+
+Example of the failure mode to avoid: given a real, readable BGA Compendium document that happens not to state a specific periodicity figure, WRONG: "The BGA Compendium wasn't retrieved successfully this time." RIGHT: "I have the BGA Compendium General Information section in front of me, but it doesn't state a reweighing interval — it only covers [what it does cover]."
+
 When TNS search results are provided to you, they come from an index of BGA Technical News Sheets. If a result is relevant to the question, tell the user the topic is covered in that TNS and give them the BGA library link so they can read the authoritative current copy. Quote only the short matched lines provided — the full TNS text is not in the Archive and you have not read it. The TNS index covers born-digital issues from roughly 2008 to the present; earlier sheets back to 1975 exist and can be browsed at members.gliding.co.uk/library/tns/.
 
 If the user writes in German, French, or Spanish, respond naturally in that language. Note that archive documents are predominantly in English, so technical terms and source citations will be in English. You may introduce yourself in the user's language if greeted in that language.`;
@@ -1118,6 +1122,25 @@ exports.handler = async function(event, context) {
     let reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
     const wkGate = wkApplyChecksumGate(reply, wkResults);
     reply = wkGate.reply;
+
+    // Detection (not correction) for a confabulation pattern found in golden-
+    // set testing 5/8/26: the model sometimes claims a document "failed to
+    // load," "wasn't retrieved," "404," etc. when it was in fact retrieved
+    // successfully and is sitting in its own context -- it just didn't find
+    // the specific fact inside it. Three escalating prompt rewrites in the
+    // system prompt (RETRIEVAL-FAILURE HONESTY) did not fully suppress this.
+    // Auto-rewriting the reply here would risk mangling otherwise-good text
+    // (unlike the wk- quote gate, there's no clean span to excise), so this
+    // only detects and logs -- visibility for now, not a fix. If every
+    // FILE_INDEX doc this turn was actually fetched successfully (no real
+    // failures) but the reply still uses fetch-failure language, that's a
+    // near-certain false claim.
+    const FETCH_FAILURE_PHRASES = /\b(failed to load|wasn'?t retrieved|not retrieved|was not retrieved|were not retrieved|404|came back empty|not delivered|wasn'?t delivered|returned an error|couldn'?t (be )?retriev)/i;
+    const suspectedFalseFetchClaim = failedLabels.length === 0 && relevantDocs.length > 0 && FETCH_FAILURE_PHRASES.test(reply);
+    if (suspectedFalseFetchClaim) {
+      console.log(`[archivist][SUSPECTED-CONFABULATION] reply used fetch-failure language but all ${relevantDocs.length} FILE_INDEX doc(s) were actually fetched successfully (fetchedLabels: ${fetchedLabels.join(', ')})`);
+    }
+
     console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
 
     // Full provenance for the sources panel. Previously `sources` listed only
@@ -1170,6 +1193,7 @@ exports.handler = async function(event, context) {
     if (process.env.DEBUG_TIMING === '1' || (event.queryStringParameters && event.queryStringParameters.debug === '1')) {
       body._timing = timing;
       if (fetchDocFailures.length > 0) body._docFetchFailures = fetchDocFailures;
+      if (suspectedFalseFetchClaim) body._suspectedConfabulation = true;
     }
 
     return {
