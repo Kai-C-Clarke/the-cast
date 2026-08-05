@@ -931,6 +931,7 @@ exports.handler = async function(event, context) {
     let wkResults = [];
     const retrievalT0 = Date.now();
     const docsT0 = Date.now();
+    const fetchDocFailures = []; // diagnostic detail for the retry above, surfaced via ?debug=1
     await Promise.all([
       ...relevantDocs.map(async (doc) => {
       try {
@@ -964,9 +965,23 @@ exports.handler = async function(event, context) {
           const ingestDate = record.ingest && record.ingest.date ? record.ingest.date : 'unknown';
           fetchedText += `\n\n[Downloaded: ${ingestDate}. AMPs are under strict BGA revision control — always verify the current version at members.gliding.co.uk/airworthiness-2/airworthiness-and-maintenance-procedures/]`;
         } else {
-          // Fetch from vintage-glider-knowledge-base (standard archive)
-          const meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
-          if (!meta.download_url) { failedLabels.push(doc.label); return; }
+          // Fetch from vintage-glider-knowledge-base (standard archive).
+          // One retry with backoff (5/8/26): golden-set testing found this
+          // branch failing intermittently on production (not reproducible
+          // locally against the same repo/token), consistent with a
+          // transient GitHub API hiccup rather than a path/code bug -- see
+          // fetchDocFailures for the real diagnostic captured on failure.
+          let meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
+          if (!meta.download_url) {
+            fetchDocFailures.push({ path: doc.path, attempt: 1, meta: JSON.stringify(meta).slice(0, 200) });
+            await new Promise(r => setTimeout(r, 700));
+            meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
+          }
+          if (!meta.download_url) {
+            fetchDocFailures.push({ path: doc.path, attempt: 2, meta: JSON.stringify(meta).slice(0, 200) });
+            failedLabels.push(doc.label);
+            return;
+          }
           const rawBuffer = await fetchRawUrl(meta.download_url);
           fetchedText = rawBuffer.toString('utf8');
         }
@@ -1146,6 +1161,7 @@ exports.handler = async function(event, context) {
 
     const timing = timer.summary();
     console.log(`[archivist][timing] docs=${timing.docs ?? '-'}ms tns=${timing.tns ?? '-'}ms reference=${timing.reference ?? '-'}ms scannedTns=${timing.scannedTns ?? '-'}ms wk=${timing.wk ?? '-'}ms retrievalTotal=${timing.retrievalTotal ?? '-'}ms anthropic=${timing.anthropic ?? '-'}ms log=${timing.log ?? '-'}ms total=${timing.total}ms`);
+    if (fetchDocFailures.length > 0) console.log(`[archivist][doc-fetch-failure] ${JSON.stringify(fetchDocFailures)}`);
 
     const body = { reply, sources: sourceLabels, sourceDetails };
     // Debug timing exposed via env var OR a per-request query param, so real
@@ -1153,6 +1169,7 @@ exports.handler = async function(event, context) {
     // needed to see where the tail latency actually goes) -- Fable, 5/8/26.
     if (process.env.DEBUG_TIMING === '1' || (event.queryStringParameters && event.queryStringParameters.debug === '1')) {
       body._timing = timing;
+      if (fetchDocFailures.length > 0) body._docFetchFailures = fetchDocFailures;
     }
 
     return {
