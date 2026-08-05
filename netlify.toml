@@ -1,9 +1,25 @@
 [build]
   functions = "netlify/functions"
   publish = "."
+  # Fetches the search indexes fresh from private repos into
+  # netlify/functions/data/ before functions are bundled (see
+  # scripts/fetch-bundled-data.sh and the DATA_DIR comment in archivist.js).
+  # Deliberately NOT a git-committed data folder -- this repo is public.
+  command = "bash scripts/fetch-bundled-data.sh"
 
 [build.processing]
   skip_processing = true
+
+[functions]
+  # Bundle whatever [build] command just fetched into netlify/functions/data/
+  # directly into the archivist function's deployment package, so cold
+  # instances read them from local disk instead of fetching from GitHub's API
+  # at request time. Fixes the 4/8/26 concurrency bug (3/10 timeouts, 15-29s
+  # responses at 10 concurrent cold requests) caused by every cold instance
+  # independently hitting GitHub simultaneously. This folder is empty in git
+  # (gitignored) -- it only exists during/after a Netlify build. See
+  # archivist.js DATA_DIR comment for the staleness trade-off this introduces.
+  included_files = ["netlify/functions/data/*.json"]
 
 [[headers]]
   for = "/*"

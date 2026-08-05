@@ -1,8 +1,70 @@
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
+
+// ── Bundled data (4/8/26 concurrency fix, revised 5/8/26) ──────────────────────
+// The four search indexes used to be fetched from GitHub's API on every cold
+// instance (see githubApiRaw below). Under concurrent traffic, Netlify spins up
+// N cold instances that each hit GitHub's API simultaneously for the same
+// files -- measured 3/10 timeouts and 15-29s responses at 10 concurrent cold
+// requests (4/8/26 test). Fix: netlify/functions/data/*.json is populated by
+// scripts/fetch-bundled-data.sh, run as this repo's Netlify BUILD command (see
+// netlify.toml [build] command), which pulls the indexes fresh from the
+// private glider-workshop / vintage-glider-knowledge-base repos at deploy
+// time using the GITHUB_TOKEN env var already set on Netlify. netlify.toml's
+// included_files then bundles whatever that script wrote into the function's
+// own deployment package, so cold instances read local disk instead of
+// hitting GitHub over the network.
+// DELIBERATELY NOT git-committed: this repo (the-cast) is public, and this
+// data derives from privately-held club material and, for the wk- index,
+// content used under a restricted-use permission (Wally Kahn / BGA eBook
+// Collection, granted by Pete Stratten -- private store, never rehost). An
+// earlier version of this fix committed the data (and the 155 wk- book texts)
+// straight into this public repo; caught and reverted before ever pushing
+// (5/8/26). netlify/functions/data/ and wk-books/ are now .gitignored so that
+// mistake can't happen again. Falls back to a live GitHub fetch if the build
+// step hasn't run (e.g. local dev), so nothing hard-fails either way.
+// TRADE-OFF: this data reflects whatever the source repos held at the START
+// of the most recent Netlify build/deploy, not the live state. A source-repo
+// change only takes effect on Alf after the next deploy (any push to
+// the-cast, or a manual "Trigger deploy" in Netlify if only the data changed).
+const DATA_DIR = path.join(__dirname, 'data');
+function readBundled(filename) {
+  try {
+    return fs.readFileSync(path.join(DATA_DIR, filename), 'utf8');
+  } catch (e) {
+    return null;
+  }
+}
+
+// ── Per-phase timing instrumentation (4/8/26) ──────────────────────────────────
+// Answers "where does the 15-29s actually go" before optimizing further.
+// Logged as one structured line per request so it's greppable in Netlify's
+// function logs; also returned in the (non-production) response when
+// DEBUG_TIMING=1 is set, for local/manual testing.
+function makeTimer() {
+  const marks = {};
+  const start = Date.now();
+  return {
+    async time(label, fn) {
+      const t0 = Date.now();
+      try {
+        return await fn();
+      } finally {
+        marks[label] = Date.now() - t0;
+      }
+    },
+    mark(label, ms) { marks[label] = ms; },
+    summary() {
+      marks.total = Date.now() - start;
+      return marks;
+    }
+  };
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -303,12 +365,24 @@ function wkTokenize(query) {
 
 async function loadWkIndex() {
   if (wkIndexCache) return wkIndexCache;
+  const bundled = readBundled('wk_index.json');
+  if (bundled) { wkIndexCache = JSON.parse(bundled); return wkIndexCache; }
   const res = await githubApiRaw(WK_REPO, WK_INDEX_PATH);
   if (res.status !== 200 || !res.body) throw new Error('wk- index fetch failed: ' + res.status);
   wkIndexCache = JSON.parse(res.body);
   return wkIndexCache;
 }
 
+// Book texts are fetched from the private vintage-glider-knowledge-base repo,
+// same as before (26/7/26 design) -- NOT bundled and NOT statically hosted.
+// The wk- collection is used under a restricted-use permission from Pete
+// Stratten (private store, never rehost, snippet-only to the model) -- an
+// early version of this fix moved the 155 book-text files to static hosting
+// on this repo's own site, which would have published full extracted text of
+// copyrighted books via a public GitHub repo. Reverted 5/8/26 before deploy;
+// see commit history. Only 3-4 of 155 books are touched per query and they
+// were never the dominant contention source in the concurrency bug (the four
+// INDEX loads were), so this stays as a per-request GitHub fetch.
 async function loadWkBook(slug) {
   if (wkBookCache[slug]) return wkBookCache[slug];
   const res = await githubApiRaw(WK_REPO, `${WK_COLLECTION_DIR}/extracted_text/${slug}.json`);
@@ -453,6 +527,8 @@ function wkApplyChecksumGate(reply, wkResults) {
 
 async function loadTnsIndex() {
   if (tnsIndexCache) return tnsIndexCache;
+  const bundled = readBundled('tns_fulltext.json');
+  if (bundled) { tnsIndexCache = JSON.parse(bundled); return tnsIndexCache; }
   // Raw fetch: immune to the >1MB content:'' trap (same fix as loadReferenceIndex 26/7/26)
   const res = await githubApiRaw(LOG_REPO, TNS_INDEX_PATH);
   if (res.status !== 200 || !res.body) throw new Error('TNS index fetch failed: ' + res.status);
@@ -474,7 +550,8 @@ async function searchTNS(query) {
     if (hits.length === 0) continue;
     // require 2+ distinct keyword hits unless the query only offered one keyword
     if (hits.length < Math.min(2, words.length)) continue;
-    const score = hits.length;
+    // IDF-weighted (4/8/26) — same tie-flood fix as searchReference
+    const score = hits.reduce((sum, w) => sum + idfWeight(index, w), 0);
     // snippets: lines containing the most keywords
     const lines = entry.text.split('\n');
     const snips = lines
@@ -488,10 +565,40 @@ async function searchTNS(query) {
   return results.sort((a, b) => b.score - a.score).slice(0, 3);
 }
 
+// ── IDF term-weighting (4/8/26, Fable's flagged quality risk) ─────────────────
+// Plain hit-count scoring ties common words (e.g. "glider", "landing",
+// "accidents") with rare, distinguishing words at the same score, so a query
+// like "glider landing accidents" tie-floods at score 2-3 and top-4 selection
+// becomes near-arbitrary among everything that happens to contain those common
+// words. Standard fix: weight each matched word by inverse document frequency
+// (rare words that appear in few entries count for more than words that appear
+// in nearly all of them). Document frequency is computed lazily per word and
+// memoized on the index object (index._dfCache) so repeat queries on a warm
+// instance don't re-scan every entry.
+function idfWeight(index, word) {
+  if (!index._dfCache) index._dfCache = new Map();
+  let df = index._dfCache.get(word);
+  if (df === undefined) {
+    df = 0;
+    for (const entry of index.entries) {
+      const t = (entry._textLower || (entry._textLower = entry.text.toLowerCase()));
+      if (textMatches(t, word)) df++;
+    }
+    index._dfCache.set(word, df);
+  }
+  const n = index.entries.length;
+  // +1 smoothing so a word appearing in every entry still contributes a small
+  // positive weight rather than zero; floor at 0.15 so an unusually common word
+  // never fully zeroes out a genuine match, just outweighed by rarer ones.
+  return Math.max(0.15, Math.log((n + 1) / (df + 1)) + 1);
+}
+
 // ── Reference document search (BGA Standard Repairs, Compendium, Inspector Course, Datasheets, AC43, OM100) ──
 
 async function loadReferenceIndex() {
   if (referenceIndexCache) return referenceIndexCache;
+  const bundled = readBundled('reference_fulltext.json');
+  if (bundled) { referenceIndexCache = JSON.parse(bundled); return referenceIndexCache; }
   const res = await githubApiRaw(LOG_REPO, REFERENCE_INDEX_PATH);
   if (res.status !== 200 || !res.body) throw new Error('Reference index fetch failed: ' + res.status);
   referenceIndexCache = JSON.parse(res.body);
@@ -526,7 +633,12 @@ async function searchReference(query) {
     // covering it?" buried wb-bocian under fabric documents matched on "covering".
     const types = (entry.aircraft_types || []).map(t => String(t).toLowerCase());
     const typeHits = words.filter(w => types.some(t => textMatches(t, w))).length;
-    const score = hits.length + (typeHits + labelHits) * 3;
+    // IDF-weighted text hits: a rare, distinguishing word counts for more than a
+    // common one, breaking the tie-floods plain hit-counting produced on
+    // generic-word queries. Type/label hits keep their existing 3x bonus
+    // structure unchanged — they're already a strong, deliberate signal.
+    const weightedHits = hits.reduce((sum, w) => sum + idfWeight(index, w), 0);
+    const score = weightedHits + (typeHits + labelHits) * 3;
     const lines = entry.text.split('\n');
     const snips = lines
       .map(l => ({ l, n: hits.filter(w => textMatches(l.toLowerCase(), w)).length, d: /\d/.test(l) ? 1 : 0 }))
@@ -556,15 +668,20 @@ async function searchScannedTNS(query) {
 
   const allResults = [];
 
-  await Promise.all(Object.entries(TNS_DECADE_PATHS).map(async ([decade, path]) => {
+  await Promise.all(Object.entries(TNS_DECADE_PATHS).map(async ([decade, decadePath]) => {
     try {
       if (!tnsDecadeCache[decade]) {
-        // Raw fetch: 1980s (3.2MB), 1990s (3.9MB), 2000s (1.9MB) exceed the 1MB
-        // content:'' JSON-API limit — the old path silently returned nothing for
-        // those three decades (confirmed dead 26/7/26, same trap as reference index)
-        const res = await githubApiRaw(LOG_REPO, path);
-        if (res.status !== 200 || !res.body) return;
-        tnsDecadeCache[decade] = JSON.parse(res.body);
+        const bundled = readBundled(`tns_${decade}.json`);
+        if (bundled) {
+          tnsDecadeCache[decade] = JSON.parse(bundled);
+        } else {
+          // Raw fetch: 1980s (3.2MB), 1990s (3.9MB), 2000s (1.9MB) exceed the 1MB
+          // content:'' JSON-API limit — the old path silently returned nothing for
+          // those three decades (confirmed dead 26/7/26, same trap as reference index)
+          const res = await githubApiRaw(LOG_REPO, decadePath);
+          if (res.status !== 200 || !res.body) return;
+          tnsDecadeCache[decade] = JSON.parse(res.body);
+        }
       }
       const index = tnsDecadeCache[decade];
       for (const entry of index.entries) {
@@ -772,6 +889,7 @@ exports.handler = async function(event, context) {
     };
   }
 
+  const timer = makeTimer();
   try {
     const { messages } = JSON.parse(event.body);
     const userTurns = (messages || []).filter(m => m.role === 'user');
@@ -793,6 +911,8 @@ exports.handler = async function(event, context) {
     let referenceResults = [];
     let scannedTnsResults = [];
     let wkResults = [];
+    const retrievalT0 = Date.now();
+    const docsT0 = Date.now();
     await Promise.all([
       ...relevantDocs.map(async (doc) => {
       try {
@@ -836,24 +956,26 @@ exports.handler = async function(event, context) {
         failedLabels.push(doc.label);
         console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
       }
+      timer.mark('docs', Date.now() - docsT0);
     }),
-      Promise.race([
+      timer.time('tns', () => Promise.race([
         searchTNS(routingQuery).then(r => { tnsResults = r; }),
         new Promise(resolve => setTimeout(resolve, 6000))
-      ]).catch(e => console.log(`[archivist] TNS search skipped: ${e.message}`)),
-      Promise.race([
+      ])).catch(e => console.log(`[archivist] TNS search skipped: ${e.message}`)),
+      timer.time('reference', () => Promise.race([
         searchReference(routingQuery).then(r => { referenceResults = r; }),
         new Promise(resolve => setTimeout(resolve, 8000))
-      ]).catch(e => console.log(`[archivist] Reference search skipped: ${e.message}`)),
-      Promise.race([
+      ])).catch(e => console.log(`[archivist] Reference search skipped: ${e.message}`)),
+      timer.time('scannedTns', () => Promise.race([
         searchScannedTNS(routingQuery).then(r => { scannedTnsResults = r; }),
         new Promise(resolve => setTimeout(resolve, 12000))
-      ]).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`)),
-      Promise.race([
+      ])).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`)),
+      timer.time('wk', () => Promise.race([
         searchWkCollection(routingQuery).then(r => { wkResults = r; }),
         new Promise(resolve => setTimeout(resolve, 12000))
-      ]).catch(e => console.log(`[archivist] wk- collection search skipped: ${e.message}`))
+      ])).catch(e => console.log(`[archivist] wk- collection search skipped: ${e.message}`))
     ]);
+    timer.mark('retrievalTotal', Date.now() - retrievalT0);
 
     if (tnsResults.length > 0) {
       console.log(`[archivist] TNS hits: ${tnsResults.map(t => t.label).join(', ')}`);
@@ -932,12 +1054,12 @@ exports.handler = async function(event, context) {
     const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     const allMessages = [...priorMessages, { role: 'user', content: userContent }];
 
-    const response = await anthropicPost({
+    const response = await timer.time('anthropic', () => anthropicPost({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: [{ type: 'text', text: ARCHIVIST_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: allMessages
-    });
+    }));
 
     if (!response.content || !response.content[0]) {
       throw new Error('Anthropic error: ' + JSON.stringify(response));
@@ -979,22 +1101,29 @@ exports.handler = async function(event, context) {
     // Log the exchange for weekly review (disclosed on page). Time-boxed and
     // failure-tolerant: a slow or failed log write must never delay the answer.
     try {
-      await Promise.race([
+      await timer.time('log', () => Promise.race([
         logConversation(latestQuery, reply, sourceLabels, failedLabels, wkGate.flagged),
         new Promise(resolve => setTimeout(resolve, 4000))
-      ]);
+      ]));
     } catch (e) {
       console.log(`[archivist] Log skipped: ${e.message}`);
     }
 
+    const timing = timer.summary();
+    console.log(`[archivist][timing] docs=${timing.docs ?? '-'}ms tns=${timing.tns ?? '-'}ms reference=${timing.reference ?? '-'}ms scannedTns=${timing.scannedTns ?? '-'}ms wk=${timing.wk ?? '-'}ms retrievalTotal=${timing.retrievalTotal ?? '-'}ms anthropic=${timing.anthropic ?? '-'}ms log=${timing.log ?? '-'}ms total=${timing.total}ms`);
+
+    const body = { reply, sources: sourceLabels, sourceDetails };
+    if (process.env.DEBUG_TIMING === '1') body._timing = timing;
+
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ reply, sources: sourceLabels, sourceDetails })
+      body: JSON.stringify(body)
     };
 
   } catch (err) {
-    console.log(`[archivist] Error: ${err.message}`);
+    const timing = timer.summary();
+    console.log(`[archivist] Error: ${err.message} | [archivist][timing] total=${timing.total}ms ${JSON.stringify(timing)}`);
     return {
       statusCode: 500,
       headers: CORS_HEADERS,

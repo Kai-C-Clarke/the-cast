@@ -1,0 +1,8 @@
+
+# Bundled search-index data, fetched at Netlify build time from private repos
+# (see scripts/fetch-bundled-data.sh + netlify.toml build.command). This data
+# includes/derives from copyrighted material under restricted-use permission
+# (Wally Kahn / BGA eBook Collection) and privately-held club material — it
+# must NEVER be committed to this repo, which is deliberately public.
+/netlify/functions/data/
+/wk-books/
