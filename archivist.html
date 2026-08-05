@@ -34,6 +34,32 @@ body {
 }
 
 /* ── Header ── */
+/* BGA-aligned top strip + accent stripe (5/8/26, mockup approved by Jon
+   4/8/26). Sits above Alf's own header, unchanged in style/character below.
+   Non-sticky by design -- scrolls away with the page, leaving Alf's sticky
+   header as the persistent chrome, matching how the approved mockup framed
+   this as "BGA band above, Alf's character unchanged below." */
+#bga-topbar {
+  background: #0a1450;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: Arial, Helvetica, sans-serif;
+}
+#bga-topbar .badge {
+  font-size: 11px;
+  color: #b8c6e8;
+  letter-spacing: 0.03em;
+}
+#bga-topbar .badge strong { color: #ffffff; }
+#bga-topbar a { color: #b8c6e8; }
+#bga-topbar a:hover { color: #ffffff; }
+#bga-accent-stripe {
+  height: 4px;
+  background: #5b9bd5;
+}
+
 #chat-header {
   display: flex;
   align-items: center;
@@ -547,6 +573,12 @@ body {
 </style>
 </head>
 <body>
+
+<div id="bga-topbar">
+  <div class="badge">An independent research tool, linked from <a href="https://www.gliding.co.uk/" target="_blank" rel="noopener">gliding.co.uk</a></div>
+  <div class="badge" style="color:#ffffff; font-weight:bold;">BGA</div>
+</div>
+<div id="bga-accent-stripe"></div>
 
 <header id="chat-header">
   <img id="char-avatar" src="alf.jpg" alt="Alf Kirby">
