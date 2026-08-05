@@ -325,9 +325,18 @@ const wkBookCache = {};  // survives warm invocations, per-book full text
 
 // FILE_INDEX full-document fetches (BGA Standard Repairs chapters, Kronfeld,
 // AMP/ingest records, etc.) had no caching at all -- every query re-fetched
-// from GitHub even for the same 1-2 documents. Simple unbounded Map is fine:
-// FILE_INDEX only has a few dozen entries, so this can never grow large.
+// from GitHub even for the same 1-2 documents. FILE_INDEX only has a few
+// dozen entries so this can't grow large in practice, but capped anyway
+// (simple oldest-first eviction) per Fable's review (5/8/26) so a long-lived
+// warm instance can't accumulate unboundedly if FILE_INDEX grows later.
 const docFetchCache = new Map(); // doc.path -> truncated docText string
+const DOC_CACHE_MAX = 100;
+function cacheDoc(path, text) {
+  if (docFetchCache.size >= DOC_CACHE_MAX) {
+    docFetchCache.delete(docFetchCache.keys().next().value); // oldest entry
+  }
+  docFetchCache.set(path, text);
+}
 
 // --- Rate limiting (Fable, 3/8/26 pre-launch review) ---
 // In-memory, per warm Netlify instance -- not perfectly accurate across
@@ -428,19 +437,22 @@ async function searchWkCollection(query, maxCandidates = 4) {
     .sort((a, b) => b.score - a.score)
     .slice(0, maxCandidates);
 
-  const results = [];
-  for (const c of candidates) {
+  // Fetch candidate books in parallel, not sequentially -- was ~500ms x up to
+  // 4 books = ~2s of avoidable latency per request (Fable, 5/8/26 review,
+  // flagged during the concurrency retest).
+  const settled = await Promise.allSettled(candidates.map(async c => {
     const slug = index.book_ids[String(c.bookID)];
-    if (!slug) continue;
-    try {
-      const book = await loadWkBook(slug);
-      const windowPages = book.pages.filter(p => Math.abs(p.pdf_page - c.pdfPage) <= 1);
-      const windowText = windowPages.map(p => p.text).join('\n\n').slice(0, 3000);
-      results.push({ slug, pdf_page: c.pdfPage, source_url: book.source_url, score: c.score, window_text: windowText });
-    } catch (e) {
-      console.log(`[wk-search] skip ${slug}: ${e.message}`);
-    }
-  }
+    if (!slug) return null;
+    const book = await loadWkBook(slug);
+    const windowPages = book.pages.filter(p => Math.abs(p.pdf_page - c.pdfPage) <= 1);
+    const windowText = windowPages.map(p => p.text).join('\n\n').slice(0, 3000);
+    return { slug, pdf_page: c.pdfPage, source_url: book.source_url, score: c.score, window_text: windowText };
+  }));
+  const results = [];
+  settled.forEach((s, i) => {
+    if (s.status === 'fulfilled' && s.value) results.push(s.value);
+    else if (s.status === 'rejected') console.log(`[wk-search] skip: ${s.reason && s.reason.message}`);
+  });
   return results;
 }
 
@@ -968,7 +980,7 @@ exports.handler = async function(event, context) {
         // in the hot path, and repeated queries very often hit the same 1-2
         // FILE_INDEX documents (5/8/26, after the concurrency retest showed
         // 0/20 timeouts but tail latency still climbing under load).
-        docFetchCache.set(doc.path, docText);
+        cacheDoc(doc.path, docText);
         docContent.push({
           type: 'text',
           text: `[Archive document: ${doc.label}]\n\n${docText}`,
@@ -1136,7 +1148,12 @@ exports.handler = async function(event, context) {
     console.log(`[archivist][timing] docs=${timing.docs ?? '-'}ms tns=${timing.tns ?? '-'}ms reference=${timing.reference ?? '-'}ms scannedTns=${timing.scannedTns ?? '-'}ms wk=${timing.wk ?? '-'}ms retrievalTotal=${timing.retrievalTotal ?? '-'}ms anthropic=${timing.anthropic ?? '-'}ms log=${timing.log ?? '-'}ms total=${timing.total}ms`);
 
     const body = { reply, sources: sourceLabels, sourceDetails };
-    if (process.env.DEBUG_TIMING === '1') body._timing = timing;
+    // Debug timing exposed via env var OR a per-request query param, so real
+    // load-test traffic can be profiled directly (no Netlify dashboard/token
+    // needed to see where the tail latency actually goes) -- Fable, 5/8/26.
+    if (process.env.DEBUG_TIMING === '1' || (event.queryStringParameters && event.queryStringParameters.debug === '1')) {
+      body._timing = timing;
+    }
 
     return {
       statusCode: 200,
