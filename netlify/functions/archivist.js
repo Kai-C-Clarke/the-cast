@@ -323,6 +323,12 @@ const WK_LANDING_PAGE = 'https://www.lakesgc.co.uk/mainwebpages/Wally%20Kahn%20B
 let wkIndexCache = null; // survives warm invocations
 const wkBookCache = {};  // survives warm invocations, per-book full text
 
+// FILE_INDEX full-document fetches (BGA Standard Repairs chapters, Kronfeld,
+// AMP/ingest records, etc.) had no caching at all -- every query re-fetched
+// from GitHub even for the same 1-2 documents. Simple unbounded Map is fine:
+// FILE_INDEX only has a few dozen entries, so this can never grow large.
+const docFetchCache = new Map(); // doc.path -> truncated docText string
+
 // --- Rate limiting (Fable, 3/8/26 pre-launch review) ---
 // In-memory, per warm Netlify instance -- not perfectly accurate across
 // multiple concurrent cold instances under a real traffic spike, but a
@@ -916,6 +922,17 @@ exports.handler = async function(event, context) {
     await Promise.all([
       ...relevantDocs.map(async (doc) => {
       try {
+        const cached = docFetchCache.get(doc.path);
+        if (cached) {
+          docContent.push({
+            type: 'text',
+            text: `[Archive document: ${doc.label}]\n\n${cached}`,
+            cache_control: { type: 'ephemeral' }
+          });
+          fetchedLabels.push(doc.label);
+          timer.mark('docs', Date.now() - docsT0);
+          return;
+        }
         let fetchedText;
         if (doc.path.startsWith('glider-workshop/')) {
           // Fetch from glider-workshop repo (ingest JSON records)
@@ -946,6 +963,12 @@ exports.handler = async function(event, context) {
           docText += `\n\n[DOCUMENT TRUNCATED at ${MAX_CHARS} characters — ${fetchedText.length - MAX_CHARS} characters beyond this point were not loaded. If the answer may lie in the unloaded portion, say so plainly rather than answering as if the document were complete.]`;
           console.log(`[archivist] TRUNCATED ${doc.label}: ${fetchedText.length} chars -> ${MAX_CHARS}`);
         }
+        // Cache full-document fetches (not just search indexes) on the warm
+        // instance -- these were the other network-bound, uncached GitHub call
+        // in the hot path, and repeated queries very often hit the same 1-2
+        // FILE_INDEX documents (5/8/26, after the concurrency retest showed
+        // 0/20 timeouts but tail latency still climbing under load).
+        docFetchCache.set(doc.path, docText);
         docContent.push({
           type: 'text',
           text: `[Archive document: ${doc.label}]\n\n${docText}`,
