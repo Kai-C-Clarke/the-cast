@@ -73,7 +73,7 @@ button { font-family: var(--font-body); cursor: pointer; }
   border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600;
 }
 #new-chat-btn:hover { background: var(--green-wash); }
-#archive-toggle { display: none; }
+
 
 /* ---------- Hero ---------- */
 #hero {
@@ -98,15 +98,15 @@ button { font-family: var(--font-body); cursor: pointer; }
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: 1fr;
   gap: 0;
-  max-width: 1280px;
+  max-width: 900px;
   width: 100%;
   margin: 0 auto;
 }
 
 /* ---------- Chat column ---------- */
-#chat-col { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-right: 1px solid var(--line); }
+#chat-col { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 #messages { flex: 1; padding: 26px 28px 10px; overflow-y: auto; }
 .message { max-width: 92%; margin-bottom: 18px; animation: rise .25s ease; }
 @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -186,7 +186,12 @@ button { font-family: var(--font-body); cursor: pointer; }
   background: var(--panel);
   padding: 20px 18px 30px;
   overflow-y: auto;
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(88vw, 400px); z-index: 60;
+  transform: translateX(100%); transition: transform .25s ease;
+  box-shadow: -8px 0 30px rgba(0,0,0,0.12);
+  border-left: 1px solid var(--line);
 }
+#archive-col.open { transform: none; }
 #archive-col h2 {
   font-family: var(--font-display); font-size: 17px; font-weight: 700; margin-bottom: 4px;
 }
@@ -250,19 +255,11 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
   #hero .avatar-ring { width: 60px; height: 60px; }
   #hero { padding: 14px 16px 12px; }
   #chat-col { border-right: none; }
-  #archive-toggle { display: inline-block; }
-  #archive-col {
-    position: fixed; inset: 0 0 0 auto; width: min(86vw, 380px); z-index: 60;
-    transform: translateX(100%); transition: transform .25s ease;
-    box-shadow: -8px 0 30px rgba(0,0,0,0.12);
-  }
-  #archive-col.open { transform: none; }
-  #archive-close { display: block; margin-bottom: 10px; background: none; border: none; color: var(--green); font-size: 15px; font-weight: 600; }
   #messages, #chips, #input-bar { padding-left: 16px; padding-right: 16px; }
   #disclaimer { margin: 0 16px; }
   .message { max-width: 100%; }
 }
-#archive-close { display: none; }
+#archive-close { display: block; margin-bottom: 10px; background: none; border: none; color: var(--green); font-size: 15px; font-weight: 600; }
 #drawer-scrim { display: none; position: fixed; inset: 0; background: rgba(29,27,23,0.3); z-index: 50; }
 #drawer-scrim.open { display: block; }
 </style>
@@ -277,7 +274,7 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
   </div>
   <span class="spacer"></span>
   <a class="topbar-link" href="#about">About &amp; sources</a>
-  <button class="topbar-link" id="archive-toggle" aria-label="Open the archive browser">Archive</button>
+  <button class="topbar-link" id="archive-toggle" aria-label="Open the archive browser">View the Archive</button>
   <button id="new-chat-btn">New chat</button>
 </header>
 
@@ -421,6 +418,7 @@ function closeDrawer(){ archiveCol.classList.remove('open'); scrim.classList.rem
 document.getElementById('archive-toggle').addEventListener('click', openDrawer);
 document.getElementById('archive-close').addEventListener('click', closeDrawer);
 scrim.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
 /* ============ Chat ============ */
 const messagesEl = document.getElementById('messages');
@@ -515,7 +513,14 @@ function addMessage(role, text, sources, sourceDetails, isError) {
   }
 
   messagesEl.appendChild(div);
-  scrollBottom();
+  if (role === 'assistant') {
+    // Show the START of Alf's answer — the reader scrolls down through it,
+    // not up to find where it began.
+    div.scrollIntoView({ block: 'start' });
+    messagesEl.scrollTop = Math.max(0, messagesEl.scrollTop - 8);
+  } else {
+    scrollBottom();
+  }
   return div;
 }
 
