@@ -262,7 +262,7 @@ const FILE_INDEX = [
   { keywords: ['harness','seat belt','belt','lap strap','shoulder harness'], path: 'general_airworthiness/AMP/amp_1-5_seat_harnesses_and_belts.txt', label: 'AMP 1-5 — Seat Harnesses and Belts' },
   { keywords: ['transponder','squawk','mode c','mode s','ssr','ads-b'], path: 'general_airworthiness/AMP/amp_1-7_transponder_maintenance.txt', label: 'AMP 1-7 — Transponder Maintenance' },
   { keywords: ['trailer','trailer maintenance','road trailer','transport'], path: 'general_airworthiness/AMP/amp_1-8_trailer_maintenance.txt', label: 'AMP 1-8 — Trailer Maintenance' },
-  { keywords: ['weighing','weight','balance','centre of gravity','cg','mass balance'], path: 'general_airworthiness/AMP/amp_1-9_glider_weighing.txt', label: 'AMP 1-9 — Glider Weighing' },
+  { keywords: ['weighing','weight','balance','centre of gravity','cg','mass balance','weigh','weigh a glider','how to weigh','weigh my glider'], path: 'general_airworthiness/AMP/amp_1-9_glider_weighing.txt', label: 'AMP — Glider Weighing (v2, Jan 2024, current)' },
   { keywords: ['battery','battery maintenance','lead acid','lithium','12v','electrolyte'], path: 'general_airworthiness/AMP/amp_1-11_battery_maintenance.txt', label: 'AMP 1-11 — Battery Maintenance' },
   { keywords: ['complex maintenance','complex repair','major repair'], path: 'general_airworthiness/AMP/amp_1-12_complex_maintenance.txt', label: 'AMP 1-12 — Complex Maintenance' },
   { keywords: ['part66l','part 66','training approval','bga cao','licence','category b','category a'], path: 'general_airworthiness/AMP/amp_1-2a_part66l_training_approval.txt', label: 'AMP 1-2a — BGA CAO Part66L Training Approval' },
