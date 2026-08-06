@@ -224,12 +224,15 @@ button { font-family: var(--font-body); cursor: pointer; }
 /* ---------- Footer ---------- */
 footer {
   flex-shrink: 0;
-  border-top: 1px solid var(--line);
-  padding: 8px 16px;
-  font-size: 12px; color: var(--muted);
+  background: #0A1450;              /* BGA navy — the acknowledgement carries the nod */
+  border-top: 4px solid #5B9BD5;    /* BGA light-blue rule */
+  padding: 9px 16px;
+  font-size: 12px; color: #B8C6E8;
   text-align: center; line-height: 1.5;
 }
-footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; white-space: nowrap; }
+footer strong { color: #FFFFFF; font-weight: 600; }
+footer a { color: #9FC1E8; }
+footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; white-space: nowrap; color: #8EA3D0; }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 900px) {
