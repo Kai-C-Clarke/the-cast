@@ -127,18 +127,49 @@ function fetchRawUrl(url) {
     const parsed = new URL(url);
     const options = {
       hostname: parsed.hostname,
-      path: parsed.pathname,
+      // CRITICAL (root-cause fix, 6/8/26): pathname + search, NOT pathname alone.
+      // GitHub's Contents API embeds a short-lived per-request access token in the
+      // query string of download_url for PRIVATE repos. Dropping parsed.search made
+      // every fetch unauthenticated — GitHub returned a "404: Not Found" body which
+      // the old code resolved as if it were file content. It intermittently "worked"
+      // only when raw.githubusercontent.com served a cached copy of an earlier
+      // authenticated request. This single bug presented as flaky fetches, model
+      // "confabulation," and the Q8/Q11 numeric inconsistencies (5/8/26).
+      path: parsed.pathname + parsed.search,
       method: 'GET',
       headers: { 'User-Agent': 'thecast-archivist' }
     };
     const req = https.request(options, (res) => {
       const chunks = [];
       res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          const bodySnippet = Buffer.concat(chunks).toString('utf8').slice(0, 200);
+          reject(new Error(`fetchRawUrl ${res.statusCode} for ${parsed.hostname}${parsed.pathname}: ${bodySnippet}`));
+          return;
+        }
+        resolve(Buffer.concat(chunks));
+      });
     });
     req.on('error', reject);
     req.end();
   });
+}
+
+// Corpus data-quality guard (6/8/26): the entire general_airworthiness/AMP/
+// directory in the private repo (28 files sampled/confirmed 6/8) is website-
+// navigation scrapes of members.gliding.co.uk — menu text, cookie/browser
+// banners, a broken "Download PDF" link — NOT the actual AMP document content.
+// Until the corpus is re-ingested (Jon's data-pipeline decision, flagged), any
+// fetched text matching this fingerprint is treated as a FAILED fetch rather
+// than fed to the model as if it were the document. Feeding it caused the model
+// to (accurately, but confusingly) describe garbage as retrieval failure.
+const SCRAPE_GARBAGE_FINGERPRINT = /The BGA website does not support this browser|for older IEs to work/i;
+function isScrapeGarbage(text) {
+  if (!text) return true;
+  if (text.trim().length < 50) return true;                 // empty/near-empty
+  if (/^\s*404: Not Found\s*$/.test(text.trim())) return true; // belt-and-braces
+  return SCRAPE_GARBAGE_FINGERPRINT.test(text.slice(0, 4000));
 }
 
 // ── File index ────────────────────────────────────────────────────────────────
@@ -267,7 +298,14 @@ function selectDocuments(query) {
   const scored = FILE_INDEX.map(entry => {
     const score = entry.keywords.filter(kw => q.includes(kw)).length;
     return { ...entry, score };
-  }).filter(e => e.score > 0).sort((a, b) => b.score - a.score);
+  }).filter(e => e.score > 0)
+    // Tie-break fix (6/8/26): JS stable sort previously broke score ties by
+    // FILE_INDEX declaration order, so a generic document declared earlier
+    // beat the specifically-titled one (Q7: the patch-overlap note, which
+    // matched the word "overlap" itself, lost a 3-way tie to two generic
+    // fabric docs). Ties now prefer the SHORTER keyword list — a reasonable
+    // specificity proxy: focused documents carry focused keyword sets.
+    .sort((a, b) => (b.score - a.score) || (a.keywords.length - b.keywords.length));
   return scored.slice(0, 2);
 }
 
@@ -989,6 +1027,15 @@ exports.handler = async function(event, context) {
           const rawBuffer = await fetchRawUrl(meta.download_url);
           fetchedText = rawBuffer.toString('utf8');
         }
+        // Corpus guard (6/8/26): never feed scrape garbage / empty / 404 bodies
+        // to the model as if they were the document. Treat as a failed fetch so
+        // the manifest + prompt handle it honestly.
+        if (isScrapeGarbage(fetchedText)) {
+          fetchDocFailures.push({ path: doc.path, attempt: 'content-guard', meta: `scrape-garbage or empty content (${fetchedText.length} chars)` });
+          failedLabels.push(doc.label);
+          console.log(`[archivist][corpus-guard] Rejected ${doc.path}: content matches scrape fingerprint or is empty (${fetchedText.length} chars)`);
+          return;
+        }
         let docText = fetchedText.slice(0, MAX_CHARS);
         if (fetchedText.length > MAX_CHARS) {
           docText += `\n\n[DOCUMENT TRUNCATED at ${MAX_CHARS} characters — ${fetchedText.length - MAX_CHARS} characters beyond this point were not loaded. If the answer may lie in the unloaded portion, say so plainly rather than answering as if the document were complete.]`;
@@ -1087,12 +1134,24 @@ exports.handler = async function(event, context) {
         `5. Tell the reader this comes from the Wally Kahn / BGA eBook Collection and that they can find the original at the source link provided in this system's sources panel — do not construct or guess a link yourself.`
       : '';
 
+    // RETRIEVAL MANIFEST (6/8/26, Fable structural fix): always present, always
+    // explicit — the failure line says "NONE" rather than being omitted when
+    // empty. Negative prompt instructions could not override what an ambiguous
+    // context appeared to say; an unambiguous, always-present statement of
+    // retrieval status removes the ambiguity itself.
+    const retrievalManifest =
+      `\n\nRETRIEVAL MANIFEST (authoritative — this overrides any impression from the documents themselves):\n` +
+      `- Successfully retrieved this turn: ${fetchedLabels.length > 0 ? fetchedLabels.join('; ') : 'NONE'}\n` +
+      `- Failed to retrieve this turn: ${failedLabels.length > 0 ? failedLabels.join('; ') : 'NONE'}\n` +
+      `Only documents on the "Failed" line may ever be described with fetch-failure language. If the manifest says NONE failed, then nothing failed — if a fact is missing from a retrieved document, say the document was retrieved but does not contain that fact.`;
+
     if (docContent.length > 0) {
       userContent.push(...docContent);
       let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
       if (failedLabels.length > 0) {
         contextNote += `\n\nNote: The following documents were identified as relevant but could not be retrieved just now: ${failedLabels.join(', ')}. Do not claim to have consulted them. If they matter to the answer, say plainly that they could not be reached and suggest the user try again.`;
       }
+      contextNote += retrievalManifest;
       contextNote += tnsNote;
       contextNote += referenceNote;
       contextNote += scannedTnsNote;
@@ -1100,7 +1159,7 @@ exports.handler = async function(event, context) {
       contextNote += `\n\nUser's question: ${latestQuery}`;
       userContent.push({ type: 'text', text: contextNote });
     } else if (failedLabels.length > 0) {
-      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${tnsNote}${referenceNote}${scannedTnsNote}${wkNote} User's question: ${latestQuery}` });
+      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${retrievalManifest}${tnsNote}${referenceNote}${scannedTnsNote}${wkNote} User's question: ${latestQuery}` });
     } else {
       userContent.push({ type: 'text', text: (tnsNote || referenceNote || scannedTnsNote || wkNote) ? `${tnsNote}${referenceNote}${scannedTnsNote}${wkNote}\n\nUser's question: ${latestQuery}` : latestQuery });
     }
@@ -1136,9 +1195,35 @@ exports.handler = async function(event, context) {
     // failures) but the reply still uses fetch-failure language, that's a
     // near-certain false claim.
     const FETCH_FAILURE_PHRASES = /\b(failed to load|wasn'?t retrieved|not retrieved|was not retrieved|were not retrieved|404|came back empty|not delivered|wasn'?t delivered|returned an error|couldn'?t (be )?retriev)/i;
-    const suspectedFalseFetchClaim = failedLabels.length === 0 && relevantDocs.length > 0 && FETCH_FAILURE_PHRASES.test(reply);
+    let suspectedFalseFetchClaim = failedLabels.length === 0 && relevantDocs.length > 0 && FETCH_FAILURE_PHRASES.test(reply);
+    let regeneratedOnDetect = false;
     if (suspectedFalseFetchClaim) {
       console.log(`[archivist][SUSPECTED-CONFABULATION] reply used fetch-failure language but all ${relevantDocs.length} FILE_INDEX doc(s) were actually fetched successfully (fetchedLabels: ${fetchedLabels.join(', ')})`);
+      // Backstop (6/8/26): with the fetchRawUrl root cause fixed and the
+      // always-present manifest in place, this should now fire rarely, if at
+      // all. When it does: one corrective regeneration, then give up and ship
+      // the original rather than loop.
+      try {
+        const retryResponse = await timer.time('anthropicRetry', () => anthropicPost({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2048,
+          system: [{ type: 'text', text: ARCHIVIST_SYSTEM, cache_control: { type: 'ephemeral' } }],
+          messages: [...allMessages,
+            { role: 'assistant', content: reply },
+            { role: 'user', content: `Correction required: your reply described a document as failing to load / not retrieved / 404, but the RETRIEVAL MANIFEST for this turn shows NO retrieval failures — every listed document was retrieved successfully and its text was shown to you. Rewrite your answer without any fetch-failure language. If a fact was missing from a retrieved document, state plainly that the document was retrieved but does not contain that fact.` }]
+        }));
+        const retryReply = (retryResponse.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+        if (retryReply && !FETCH_FAILURE_PHRASES.test(retryReply)) {
+          reply = wkApplyChecksumGate(retryReply, wkResults).reply;
+          regeneratedOnDetect = true;
+          suspectedFalseFetchClaim = false;
+          console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration succeeded — clean rewrite shipped`);
+        } else {
+          console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration still contained fetch-failure language — shipping original, flag stays up`);
+        }
+      } catch (e) {
+        console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration failed (${e.message}) — shipping original`);
+      }
     }
 
     console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
@@ -1194,6 +1279,7 @@ exports.handler = async function(event, context) {
       body._timing = timing;
       if (fetchDocFailures.length > 0) body._docFetchFailures = fetchDocFailures;
       if (suspectedFalseFetchClaim) body._suspectedConfabulation = true;
+      if (regeneratedOnDetect) body._regeneratedOnDetect = true;
     }
 
     return {
