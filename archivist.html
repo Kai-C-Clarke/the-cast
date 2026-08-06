@@ -52,12 +52,12 @@ button { font-family: var(--font-body); cursor: pointer; }
 }
 .avatar-ring {
   display: inline-block;
-  width: 38px; height: 38px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: 50%;
   padding: 2px; border: 1.5px solid var(--green);
   box-shadow: inset 0 0 0 1.5px var(--paper), inset 0 0 0 2.5px var(--green);
   flex-shrink: 0; overflow: hidden;
 }
-.avatar-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; object-position: 50% 9%; transform: scale(2.05); transform-origin: 50% 9%; display: block; }
+.avatar-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; object-position: 50% 30%; display: block; }
 #topbar .identity { line-height: 1.2; }
 #topbar .identity .name { font-family: var(--font-display); font-weight: 700; font-size: 16px; }
 #topbar .identity .role { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
@@ -267,7 +267,7 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
 <body>
 
 <header id="topbar">
-  <span class="avatar-ring"><img src="alf.jpg" alt="Alf Kirby"></span>
+  <span class="avatar-ring"><img src="alf.jpg?v=2" alt="Alf Kirby"></span>
   <div class="identity">
     <div class="name">Alf Kirby</div>
     <div class="role">Honorary Archivist</div>
@@ -279,7 +279,7 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
 </header>
 
 <section id="hero">
-  <span class="avatar-ring"><img src="alf.jpg" alt="Portrait of Alf Kirby"></span>
+  <span class="avatar-ring"><img src="alf.jpg?v=2" alt="Portrait of Alf Kirby"></span>
   <h1>&ldquo;If it&rsquo;s in t&rsquo;archive I&rsquo;ll find it. If it isn&rsquo;t, I&rsquo;ll tell you straight.&rdquo;</h1>
   <p class="sub">Wood, fabric, adhesives, airworthiness and construction — grounded in the Archive, never guessed.</p>
 </section>
