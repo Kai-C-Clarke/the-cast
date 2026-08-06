@@ -2,741 +2,473 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alf Kirby — The Glider Workshop Archive</title>
+<meta name="description" content="Research assistant for vintage glider restoration: wood, fabric, adhesives and airworthiness, grounded in the BGA and Wally Kahn archives.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Special+Elite&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: auto; }
-
 :root {
-  --ink:        #1a1208;
-  --paper:      #f2e8d5;
-  --paper-dark: #e0d0b0;
-  --tan:        #8b6914;
-  --tan-light:  #c49a3c;
-  --rust:       #7a3b1e;
-  --worn:       #5c4a2a;
-  --text:       #2a1f0e;
-  --text-dim:   #7a6040;
+  --paper: #FAF8F3;
+  --panel: #FFFFFF;
+  --ink: #1D1B17;
+  --muted: #6A665C;
+  --line: #E4E0D5;
+  --green: #3D5B45;
+  --green-dark: #2E4634;
+  --green-wash: #EDF1EC;
+  --radius: 8px;
+  --font-display: 'Bitter', Georgia, serif;
+  --font-body: 'Source Sans 3', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
-
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
 body {
-  background: var(--ink);
-  color: var(--text);
-  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16.5px;
+  line-height: 1.55;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
+a { color: var(--green); }
+button { font-family: var(--font-body); cursor: pointer; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
-/* ── Header ── */
-/* BGA-aligned top strip + accent stripe (5/8/26, mockup approved by Jon
-   4/8/26). Sits above Alf's own header, unchanged in style/character below.
-   Non-sticky by design -- scrolls away with the page, leaving Alf's sticky
-   header as the persistent chrome, matching how the approved mockup framed
-   this as "BGA band above, Alf's character unchanged below." */
-#bga-topbar {
-  background: #0a1450;
-  padding: 8px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-family: Arial, Helvetica, sans-serif;
-}
-#bga-topbar .badge {
-  font-size: 11px;
-  color: #b8c6e8;
-  letter-spacing: 0.03em;
-}
-#bga-topbar .badge strong { color: #ffffff; }
-#bga-topbar a { color: #b8c6e8; }
-#bga-topbar a:hover { color: #ffffff; }
-#bga-accent-stripe {
-  height: 4px;
-  background: #5b9bd5;
-}
-
-#chat-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  background: var(--ink);
-  border-bottom: 2px solid var(--tan);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-#char-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  object-position: top;
-  border: 2px solid var(--tan);
-  filter: sepia(20%);
-}
-
-#char-info h1 {
-  font-family: 'Special Elite', monospace;
-  font-size: 1.2rem;
-  color: var(--tan-light);
-  letter-spacing: 0.05em;
-}
-
-#char-info p {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  font-style: italic;
-  margin-top: 2px;
-}
-
-/* back-link removed */
-
-/* ── Archive badge ── */
-#archive-badge {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--rust);
-  border: 1px solid var(--rust);
-  padding: 3px 8px;
-  white-space: nowrap;
-}
-
-/* ── Chat area ── */
-#chat-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  max-width: 780px;
-  margin: 0 auto;
-  width: 100%;
-  padding: 0 0 120px;
-}
-
-#messages {
-  flex: 1;
-  padding: 24px 20px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.message {
-  max-width: 85%;
-  line-height: 1.65;
-  font-size: 0.97rem;
-}
-
-.message.user {
-  align-self: flex-end;
-  background: var(--worn);
-  color: var(--paper);
-  padding: 10px 16px;
-  border-radius: 2px 12px 12px 12px;
-  font-style: italic;
-}
-
-.message.assistant {
-  align-self: flex-start;
-  background: var(--paper);
-  color: var(--text);
-  padding: 14px 18px;
-  border-radius: 12px 12px 12px 2px;
-  border-left: 3px solid var(--tan);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-}
-
-.message.assistant .source-line {
-  margin-top: 12px;
-  font-size: 0.85rem;
-  color: var(--worn);
-  font-style: normal;
-  font-weight: 500;
-  border-top: 1px solid var(--paper-dark);
-  padding-top: 8px;
-  line-height: 1.6;
-}
-.message.assistant .source-line a {
-  color: var(--tan);
-  text-decoration: underline;
-  text-decoration-color: rgba(196,154,60,0.4);
-  text-underline-offset: 2px;
-}
-.message.assistant .source-line a:hover {
-  color: var(--tan-light);
-}
-.message-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-  background: var(--paper-dark);
-  border: 1px solid rgba(92,74,42,0.3);
-  border-radius: 3px;
-  padding: 4px 10px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.15s;
-}
-.action-btn:hover {
-  color: var(--ink);
-  background: var(--tan-light);
-  border-color: var(--tan);
-}
-
-.message.system-note {
-  align-self: center;
-  font-size: 0.78rem;
-  color: var(--text-dim);
-  font-style: italic;
-  font-family: 'Special Elite', monospace;
-  letter-spacing: 0.04em;
-}
-
-/* Typing indicator */
-.typing-dots {
-  display: flex;
-  gap: 5px;
-  padding: 14px 18px;
-  background: var(--paper);
-  border-radius: 12px 12px 12px 2px;
-  border-left: 3px solid var(--tan);
-  align-self: flex-start;
-  width: fit-content;
-}
-.typing-dots span {
-  width: 7px; height: 7px;
-  background: var(--tan);
-  border-radius: 50%;
-  animation: dot-bounce 1.2s infinite;
-}
-.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes dot-bounce {
-  0%,80%,100% { transform: translateY(0); opacity: 0.4; }
-  40% { transform: translateY(-6px); opacity: 1; }
-}
-
-/* ── Input bar ── */
-#input-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0; right: 0;
-  background: var(--ink);
-  border-top: 1px solid var(--worn);
-  padding: 14px 20px;
-  display: flex;
-  gap: 10px;
-  max-width: 780px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-#user-input {
-  flex: 1;
-  background: var(--paper);
-  color: var(--text);
-  border: 1px solid var(--worn);
-  border-radius: 4px;
-  padding: 10px 14px;
-  font-family: 'Source Serif 4', serif;
-  font-size: 0.95rem;
-  resize: none;
-  min-height: 44px;
-  max-height: 120px;
-  outline: none;
-}
-#user-input:focus { border-color: var(--tan); }
-#user-input::placeholder { color: var(--text-dim); font-style: italic; }
-
-#send-btn {
-  background: var(--tan);
-  color: var(--ink);
-  border: none;
-  border-radius: 4px;
+/* ---------- Top bar ---------- */
+#topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(250,248,243,0.96);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px;
   padding: 10px 20px;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.85rem;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: background 0.2s;
-  white-space: nowrap;
 }
-#send-btn:hover { background: var(--tan-light); }
-#send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ── Opening panel ── */
-#opening {
-  padding: 32px 20px 0;
-  max-width: 780px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.alf-intro {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  background: var(--paper);
-  border-left: 3px solid var(--tan);
-  padding: 20px;
-  border-radius: 0 8px 8px 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-}
-
-.alf-intro img {
-  width: 130px;
-  height: 130px;
-  border-radius: 8px;
-  object-fit: cover;
-  object-position: top center;
-  border: 2px solid var(--tan);
-  filter: sepia(15%);
+.avatar-ring {
+  width: 38px; height: 38px; border-radius: 50%;
+  padding: 2px; border: 1.5px solid var(--green);
+  box-shadow: inset 0 0 0 1.5px var(--paper), inset 0 0 0 2.5px var(--green);
   flex-shrink: 0;
 }
-
-.alf-intro-text h2 {
-  font-family: 'Special Elite', monospace;
-  font-size: 1rem;
-  color: var(--rust);
-  margin-bottom: 6px;
-  letter-spacing: 0.05em;
+.avatar-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+#topbar .identity { line-height: 1.2; }
+#topbar .identity .name { font-family: var(--font-display); font-weight: 700; font-size: 16px; }
+#topbar .identity .role { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+#topbar .spacer { flex: 1; }
+.topbar-link {
+  background: none; border: none; color: var(--green); font-size: 15px;
+  text-decoration: none; padding: 6px 10px; border-radius: 6px;
 }
-
-.alf-intro-text p {
-  font-size: 0.92rem;
-  line-height: 1.6;
-  color: var(--text);
-  font-style: italic;
+.topbar-link:hover { background: var(--green-wash); }
+#new-chat-btn {
+  border: 1px solid var(--green); color: var(--green); background: var(--panel);
+  border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600;
 }
+#new-chat-btn:hover { background: var(--green-wash); }
+#archive-toggle { display: none; }
 
-.archive-contents {
-  margin-top: 20px;
-  background: rgba(242,232,213,0.06);
-  border: 1px solid var(--worn);
-  padding: 16px 20px;
-  border-radius: 4px;
+/* ---------- Hero ---------- */
+#hero {
+  text-align: center;
+  padding: 34px 20px 26px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
 }
-
-.archive-contents h3 {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.75rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--tan-light);
-  margin-bottom: 12px;
+#hero .avatar-ring { width: 84px; height: 84px; margin: 0 auto 14px; border-width: 2px;
+  box-shadow: inset 0 0 0 2px var(--paper), inset 0 0 0 3.5px var(--green); }
+#hero h1 {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(20px, 3.4vw, 27px);
+  max-width: 640px; margin: 0 auto 6px;
 }
+#hero .sub { color: var(--muted); font-size: 15px; }
+#hero.collapsed { display: none; }
 
-.archive-contents ul {
-  list-style: none;
+/* ---------- Layout ---------- */
+#workspace {
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 6px 20px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 0;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
 }
 
-.archive-contents li {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  padding-left: 12px;
-  position: relative;
-  line-height: 1.4;
+/* ---------- Chat column ---------- */
+#chat-col { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
+#messages { flex: 1; padding: 26px 28px 10px; overflow-y: auto; }
+.message { max-width: 92%; margin-bottom: 18px; animation: rise .25s ease; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.message.user {
+  margin-left: auto;
+  background: var(--green-wash);
+  border: 1px solid #D9E2D8;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  white-space: pre-wrap;
 }
-.archive-contents li::before {
-  content: '›';
-  position: absolute;
-  left: 0;
-  color: var(--tan);
-}
-
-.disclaimer {
-  margin-top: 16px;
-  margin-bottom: 16px;
-  background: rgba(122, 59, 30, 0.22);
-  border: 1px solid var(--rust);
-  border-left: 4px solid var(--rust);
+.message.assistant {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: var(--radius);
   padding: 14px 18px;
-  border-radius: 0 4px 4px 0;
-  font-size: 0.92rem;
-  color: var(--tan-light);
-  line-height: 1.5;
 }
-.disclaimer strong {
-  color: var(--rust);
-  font-style: normal;
-  font-size: 1rem;
+.message.assistant.error { border-left-color: #A2543C; }
+.source-line {
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7;
+  color: var(--muted);
 }
+.source-line strong { color: var(--ink); font-weight: 500; letter-spacing: 0.04em; }
+.source-line a { color: var(--green); }
+.message-actions { margin-top: 10px; display: flex; gap: 14px; flex-wrap: wrap; }
+.action-btn {
+  font-size: 13px; color: var(--muted); text-decoration: none;
+  border: none; background: none; padding: 0;
+}
+.action-btn:hover { color: var(--green); }
+.typing-dots { padding: 8px 4px; }
+.typing-dots span {
+  display: inline-block; width: 7px; height: 7px; margin-right: 5px;
+  background: var(--green); border-radius: 50%; opacity: .35;
+  animation: blink 1.2s infinite;
+}
+.typing-dots span:nth-child(2){ animation-delay: .2s } .typing-dots span:nth-child(3){ animation-delay: .4s }
+@keyframes blink { 0%,80%,100%{opacity:.25} 40%{opacity:1} }
 
-.acknowledgement {
-  margin-top: 4px;
-  margin-bottom: 16px;
-  padding: 10px 18px;
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  line-height: 1.5;
-  font-style: italic;
+/* Chips */
+#chips { padding: 4px 28px 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 999px; padding: 7px 14px; font-size: 14px;
 }
+.chip:hover { border-color: var(--green); background: var(--green-wash); }
 
+/* Disclaimer + input */
+#disclaimer {
+  margin: 0 28px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel);
+  font-size: 12.5px; color: var(--muted); line-height: 1.45;
+}
+#disclaimer strong { color: var(--ink); }
+#input-bar { display: flex; gap: 10px; padding: 12px 28px 20px; }
+#user-input {
+  flex: 1; resize: none; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.4;
+  padding: 11px 14px; min-height: 48px; max-height: 160px;
+}
+#user-input:focus { border-color: var(--green); outline: none; box-shadow: 0 0 0 3px var(--green-wash); }
+#user-input::placeholder { color: #9A958A; }
+#send-btn {
+  background: var(--green); color: #fff; border: none; border-radius: var(--radius);
+  font-size: 16px; font-weight: 600; padding: 0 22px;
+}
+#send-btn:hover { background: var(--green-dark); }
+#send-btn:disabled { opacity: .5; cursor: default; }
 
-.archive-contents li.folder-header {
-  color: var(--tan-light);
-  font-family: 'Special Elite', monospace;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding-left: 0;
-  margin-top: 10px;
-  margin-bottom: 2px;
-  border-bottom: 1px solid rgba(196,154,60,0.2);
-  padding-bottom: 3px;
-}
-.archive-contents li.folder-header::before { content: none; }
-.archive-contents li.loading-note { font-style: italic; color: var(--text-dim); }
-
-
-/* ── Reference material dropdown ── */
-.archive-contents {
-  margin-top: 16px;
-  border: 1px solid var(--worn);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.archive-contents summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  cursor: pointer;
-  background: rgba(242,232,213,0.05);
-  border-bottom: 1px solid transparent;
-  list-style: none;
-  user-select: none;
-}
-.archive-contents summary::-webkit-details-marker { display: none; }
-.archive-contents[open] summary {
-  border-bottom-color: var(--worn);
-}
-
-.summary-label {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--tan-light);
-}
-.summary-label::before {
-  content: '▸ ';
-  color: var(--tan);
-}
-.archive-contents[open] .summary-label::before {
-  content: '▾ ';
-}
-.summary-count {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  font-family: 'Special Elite', monospace;
-}
-
-
-.archive-search {
-  padding: 10px 16px 8px;
-  border-bottom: 1px solid var(--worn);
-}
-.archive-search input {
-  width: 100%;
-  background: var(--paper);
-  color: var(--text);
-  border: 1px solid var(--worn);
-  border-radius: 3px;
-  padding: 6px 10px;
-  font-family: 'Source Serif 4', serif;
-  font-size: 0.85rem;
-  outline: none;
-}
-.archive-search input:focus { border-color: var(--tan); }
-.archive-search input::placeholder { color: var(--text-dim); font-style: italic; }
-
-.archive-contents ul {
-  list-style: none;
-  padding: 0;
-  display: block;
-  max-height: 420px;
+/* ---------- Archive column ---------- */
+#archive-col {
+  background: var(--panel);
+  padding: 20px 18px 30px;
   overflow-y: auto;
-  overscroll-behavior: contain;
 }
+#archive-col h2 {
+  font-family: var(--font-display); font-size: 17px; font-weight: 700; margin-bottom: 4px;
+}
+#archive-col .count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+#archive-search {
+  width: 100%; border: 1px solid var(--line); border-radius: 6px;
+  padding: 9px 12px; font-family: var(--font-body); font-size: 14.5px;
+  background: var(--paper); color: var(--ink); margin-bottom: 10px;
+}
+#archive-search:focus { border-color: var(--green); outline: none; }
+#filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.filter {
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+  border-radius: 999px; padding: 4px 11px; font-size: 12.5px;
+}
+.filter.active { background: var(--green); border-color: var(--green); color: #fff; }
+.filter:not(.active):hover { border-color: var(--green); color: var(--green); }
+#archive-list { list-style: none; }
+#archive-list li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 8px 2px; border-bottom: 1px solid var(--line);
+  font-size: 14px; line-height: 1.35;
+}
+#archive-list .cat-tag {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em;
+  color: var(--muted); text-transform: uppercase; white-space: nowrap;
+}
+.ask-btn {
+  border: none; background: none; color: var(--green);
+  font-size: 12.5px; font-weight: 600; white-space: nowrap; padding: 2px 4px;
+}
+.ask-btn:hover { text-decoration: underline; }
+#archive-empty { color: var(--muted); font-size: 14px; padding: 12px 2px; display: none; }
 
-.category-group { margin-bottom: 4px; }
+/* ---------- Footer ---------- */
+footer {
+  border-top: 1px solid var(--line);
+  padding: 18px 28px 26px;
+  font-size: 13px; color: var(--muted);
+  text-align: center; line-height: 1.7;
+}
+footer .cast { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; }
 
-.category-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 7px 16px;
-  text-align: left;
-  border-bottom: 1px solid rgba(92,74,42,0.2);
+/* ---------- Mobile ---------- */
+@media (max-width: 900px) {
+  #workspace { grid-template-columns: 1fr; }
+  #chat-col { border-right: none; }
+  #archive-toggle { display: inline-block; }
+  #archive-col {
+    position: fixed; inset: 0 0 0 auto; width: min(86vw, 380px); z-index: 60;
+    transform: translateX(100%); transition: transform .25s ease;
+    box-shadow: -8px 0 30px rgba(0,0,0,0.12);
+  }
+  #archive-col.open { transform: none; }
+  #archive-close { display: block; margin-bottom: 10px; background: none; border: none; color: var(--green); font-size: 15px; font-weight: 600; }
+  #messages, #chips, #input-bar { padding-left: 16px; padding-right: 16px; }
+  #disclaimer { margin: 0 16px; }
+  .message { max-width: 100%; }
 }
-.category-toggle:hover { background: rgba(196,154,60,0.08); }
-
-.category-icon { font-size: 0.9rem; width: 18px; text-align: center; }
-.category-name {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--tan-light);
-  font-weight: bold;
-  flex: 1;
-}
-.category-arrow {
-  font-size: 0.7rem;
-  color: var(--text-dim);
-  transition: transform 0.2s;
-}
-.category-toggle.open .category-arrow { transform: rotate(90deg); }
-.category-count {
-  font-size: 0.68rem;
-  color: var(--text-dim);
-  font-family: 'Special Elite', monospace;
-}
-
-.category-docs {
-  display: none;
-  padding: 4px 0 6px 0;
-}
-.category-docs.open { display: block; }
-
-.archive-contents li {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  padding: 2px 16px 2px 36px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  line-height: 1.5;
-}
-.archive-contents li.hidden { display: none; }
-
-.archive-contents li .doc-name {
-  flex: 1;
-  padding-left: 12px;
-  position: relative;
-}
-.archive-contents li .doc-name::before {
-  content: '›';
-  position: absolute;
-  left: 0;
-  color: var(--tan);
-}
-
-.archive-contents li a.dl-link {
-  font-size: 0.68rem;
-  font-family: 'Special Elite', monospace;
-  color: var(--tan);
-  text-decoration: none;
-  white-space: nowrap;
-  border: 1px solid rgba(196,154,60,0.3);
-  padding: 1px 6px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.archive-contents li a.dl-link:hover { background: var(--tan); color: var(--ink); }
-.no-results {
-  padding: 10px 16px;
-  font-style: italic;
-  color: var(--text-dim);
-  font-size: 0.82rem;
-}
-
-
+#archive-close { display: none; }
+#drawer-scrim { display: none; position: fixed; inset: 0; background: rgba(29,27,23,0.3); z-index: 50; }
+#drawer-scrim.open { display: block; }
 </style>
 </head>
 <body>
 
-<div id="bga-topbar">
-  <div class="badge">An independent research tool, linked from <a href="https://www.gliding.co.uk/" target="_blank" rel="noopener">gliding.co.uk</a></div>
-  <div class="badge" style="color:#ffffff; font-weight:bold;">BGA</div>
-</div>
-<div id="bga-accent-stripe"></div>
-
-<header id="chat-header">
-  <img id="char-avatar" src="alf.jpg" alt="Alf Kirby">
-  <div id="char-info">
-    <h1>Alf Kirby</h1>
-    <p>The Glider Workshop Archive</p>
+<header id="topbar">
+  <span class="avatar-ring"><img src="alf.jpg" alt="Alf Kirby"></span>
+  <div class="identity">
+    <div class="name">Alf Kirby</div>
+    <div class="role">Honorary Archivist</div>
   </div>
-  <span id="archive-badge">Alf speaks your language</span>
-  
+  <span class="spacer"></span>
+  <a class="topbar-link" href="#about">About &amp; sources</a>
+  <button class="topbar-link" id="archive-toggle" aria-label="Open the archive browser">Archive</button>
+  <button id="new-chat-btn">New chat</button>
 </header>
 
-<div id="opening">
-  <div class="alf-intro">
-    <img src="alf.jpg" alt="Alf Kirby">
-    <div class="alf-intro-text">
-      <h2>Alf Kirby — Honorary Archivist</h2>
-      <p>Aye, come in then. Mind the drawings on that bench — some of those are originals.
-      Ask me owt you like about wood, fabric, adhesives, airworthiness, construction — if it's in t'archive I'll find it. And aye — I speak English, Deutsch, Français and Español.
-      If it isn't, I'll tell you straight.</p>
+<section id="hero">
+  <span class="avatar-ring"><img src="alf.jpg" alt="Portrait of Alf Kirby"></span>
+  <h1>&ldquo;If it&rsquo;s in t&rsquo;archive I&rsquo;ll find it. If it isn&rsquo;t, I&rsquo;ll tell you straight.&rdquo;</h1>
+  <p class="sub">Wood, fabric, adhesives, airworthiness and construction — grounded in the Archive, never guessed.</p>
+</section>
+
+<div id="workspace">
+  <div id="chat-col">
+    <div id="messages" aria-live="polite"></div>
+
+    <div id="chips" aria-label="Suggested questions">
+      <button class="chip">What scarf ratio for a solid spruce spar repair?</button>
+      <button class="chip">What overlap do I need on a fabric patch?</button>
+      <button class="chip">How do I safety-wire a turnbuckle?</button>
+      <button class="chip">Is Aerodux still available — what should I use now?</button>
+      <button class="chip">How often does a glider need reweighing?</button>
+    </div>
+
+    <div id="disclaimer">
+      <strong>Alf provides research assistance only.</strong>
+      You or your inspector must verify every procedure, specification and requirement against
+      current authoritative sources. Nothing here constitutes approved maintenance data.
+    </div>
+
+    <div id="input-bar">
+      <textarea id="user-input" rows="1" placeholder="Ask Alf a workshop question…" aria-label="Ask Alf a question"></textarea>
+      <button id="send-btn">Ask Alf</button>
     </div>
   </div>
 
-  <div class="disclaimer">
-    <strong>⚠ Please note:</strong> Alf can provide information from the Archive to assist your research,
-    but it is the responsibility of you or your inspector to verify all procedures, specifications,
-    and requirements against current authoritative sources before carrying out any maintenance work.
-    Nothing Alf says constitutes approved maintenance data or a substitute for professional judgement.
-    Conversations may be recorded to improve the Archive.
-  </div>
-
-  <div class="acknowledgement">
-    Parts of this Archive draw on the Wally Kahn / BGA eBook Collection. With thanks to Wally Kahn,
-    those who built the collection, and past and present members of the BGA Technical Committee.
-  </div>
-
-  <details class="archive-contents" id="archive-details">
-    <summary>
-      <span class="summary-label">View Reference Material</span>
-      <span class="summary-count" id="doc-count"></span>
-    </summary>
-    <ul id="archive-list"><li class="loading-note">Loading archive contents...</li></ul>
-  </details>
-
+  <aside id="archive-col" aria-label="Archive browser">
+    <button id="archive-close">✕ Close</button>
+    <h2>The Archive</h2>
+    <div class="count" id="archive-count"></div>
+    <input id="archive-search" type="search" placeholder="Search the archive…" aria-label="Search the archive">
+    <div id="filters" role="group" aria-label="Filter by category"></div>
+    <ul id="archive-list"></ul>
+    <div id="archive-empty">Nowt matching that. Try a broader word — or just ask Alf.</div>
+  </aside>
 </div>
+<div id="drawer-scrim"></div>
 
-<div id="chat-container">
-  <div id="messages"></div>
-</div>
-
-<div id="input-bar">
-  <textarea id="user-input" placeholder="Ask Alf something… in English, Deutsch, Français or Español" rows="1"></textarea>
-  <button id="send-btn">Ask Alf</button>
-</div>
+<footer id="about">
+  Parts of this Archive draw on the <strong>Wally Kahn / BGA eBook Collection</strong> — with thanks to
+  Wally Kahn, those who built the collection, and past and present members of the
+  <a href="https://gliding.co.uk" target="_blank" rel="noopener">BGA</a> Technical Committee.<br>
+  Conversations may be recorded to improve the Archive.<br>
+  <span class="cast">PART OF THE CAST</span>
+</footer>
 
 <script>
-const messagesEl = document.getElementById('messages');
-const inputEl    = document.getElementById('user-input');
-const sendBtn    = document.getElementById('send-btn');
+/* ============ Archive catalogue (static — no loading states) ============ */
+const CATALOGUE = [{"t": "BGA Standard Repairs — Section 3 Chapter 3.4 (Solid Member Repairs)", "c": "Wood"}, {"t": "BGA Standard Repairs — Section 3 Chapter 3.5 (Box Member Repairs)", "c": "Wood"}, {"t": "BGA Standard Repairs — Section 3 Chapter 3.3 (Ply Repairs)", "c": "Wood"}, {"t": "BGA Standard Repairs — Section 3 Chapter 3.2 (Glues and Gluing)", "c": "Wood"}, {"t": "BGA Standard Repairs — Section 3 Chapter 3.1 (Timbers and Plywoods)", "c": "Wood"}, {"t": "BGA Standard Repairs — Section 3 (Wood Repairs)", "c": "Wood"}, {"t": "AC 43.13-1B Chapter 7 — Hardware, Control Cables, Turnbuckle Safety Methods", "c": "Construction"}, {"t": "BGA Standard Repairs — Section 4 Chapter 4.1 (Glass Fibre Repairs)", "c": "Construction"}, {"t": "BGA Standard Repairs — Section 4 Chapter 4.2 (Perspex and Canopy Repairs)", "c": "Construction"}, {"t": "BGA Standard Repairs — Section 4 Chapter 4.3 (Metal Fittings and Cables)", "c": "Construction"}, {"t": "BGA Standard Repairs — Section 4 (Fabric)", "c": "Fabric"}, {"t": "BGA Standard Repairs — Section 2 (Metal)", "c": "Construction"}, {"t": "BGA Standard Repairs — Foreword", "c": "Construction"}, {"t": "BGA Standard Repairs — Section 1", "c": "Construction"}, {"t": "BGA Standard Repairs — Section 6", "c": "Construction"}, {"t": "Resorcinol Adhesives — Current Position (June 2026)", "c": "Adhesives"}, {"t": "West System — Basic Techniques", "c": "Adhesives"}, {"t": "West System — The Products", "c": "Adhesives"}, {"t": "West System — Problem Solver", "c": "Adhesives"}, {"t": "West System — Cold Temperature Bonding", "c": "Adhesives"}, {"t": "Gougeon Brothers — Part 1", "c": "Adhesives"}, {"t": "Gougeon Brothers — Part 2", "c": "Adhesives"}, {"t": "Flickfibel 1978 — GRP Repair (Ursula Hänle)", "c": "Construction"}, {"t": "Ceconite Manual 101", "c": "Fabric"}, {"t": "Polyester Fabric Covering — Reference Note (2026)", "c": "Fabric"}, {"t": "Fabric Repair Patch Overlap — Ceconite + BGA Practice (2026)", "c": "Fabric"}, {"t": "BGA Compendium — General Information", "c": "Airworthiness"}, {"t": "BGA Compendium — Foreword and Instructions", "c": "Airworthiness"}, {"t": "BGA Form 205 — Task Worksheet Reference Note (May 2026)", "c": "Airworthiness"}, {"t": "BGA Compendium — Special Inspections", "c": "Airworthiness"}, {"t": "BGA Aircraft Weighing Periodicity (2020)", "c": "Airworthiness"}, {"t": "BGA Compendium — Equipment", "c": "Airworthiness"}, {"t": "BGA Compendium — Schleicher Wood Types", "c": "Wood"}, {"t": "BGA Compendium — Schempp-Hirth", "c": "Airworthiness"}, {"t": "Slingsby T.45 Swallow — Pilots Notes & Technical Data", "c": "Types"}, {"t": "BGA Compendium — Slingsby", "c": "Airworthiness"}, {"t": "BGA Compendium — Elliots (Olympia)", "c": "Airworthiness"}, {"t": "BGA CAE Exposition March 2021", "c": "Airworthiness"}, {"t": "Hoy Engineering Course — Chapter 1 (General)", "c": "Airworthiness"}, {"t": "Hoy Engineering Course — Chapter 2", "c": "Airworthiness"}, {"t": "Hoy Engineering Course — Chapter 3 (Weighing)", "c": "Airworthiness"}, {"t": "Jacobs Werkstattpraxis 1935 (English translation)", "c": "Construction"}, {"t": "Stafford Allen — Timber and Ply Repairs, Glues", "c": "Adhesives"}, {"t": "Stafford Allen — Maintenance (General)", "c": "Construction"}, {"t": "Stafford Allen — Fabric and Dope", "c": "Fabric"}, {"t": "Stafford Allen — Metal Repairs", "c": "Construction"}, {"t": "AC43.13-1B — Wood Structure (full chapter)", "c": "Wood"}, {"t": "ANC-18 — Design of Wood Aircraft Structures (Part 1)", "c": "Wood"}, {"t": "ANC-19 — Wood Aircraft Inspection and Fabrication (Part 1)", "c": "Wood"}, {"t": "AC43.13-1B Chapter 11 — Electrical Systems, Grounding and Bonding", "c": "Airworthiness"}, {"t": "Electrical Bonding in Vintage Wooden Gliders — Why It Is Absent (2026)", "c": "Wood"}, {"t": "Derek Piggott — Cumulonimbus Encounter 1955 (Lightning Case Study)", "c": "Airworthiness"}, {"t": "AC43.13-1B — Fabric Covering", "c": "Fabric"}, {"t": "Kronfeld — On Gliding and Soaring (Part 1)", "c": "Books"}, {"t": "AMP 1-1 — ARC Renewal (Part 21)", "c": "Airworthiness"}, {"t": "AMP 1-2 — Inspector Authorisation and Ratings", "c": "Airworthiness"}, {"t": "AMP 1-3 — Aircraft Logbooks", "c": "Airworthiness"}, {"t": "AMP 1-4 — Independent / Duplicate Inspections", "c": "Airworthiness"}, {"t": "AMP 1-5 — Seat Harnesses and Belts", "c": "Airworthiness"}, {"t": "AMP 1-7 — Transponder Maintenance", "c": "Airworthiness"}, {"t": "AMP 1-8 — Trailer Maintenance", "c": "Airworthiness"}, {"t": "AMP 1-9 — Glider Weighing", "c": "Airworthiness"}, {"t": "AMP 1-11 — Battery Maintenance", "c": "Airworthiness"}, {"t": "AMP 1-12 — Complex Maintenance", "c": "Airworthiness"}, {"t": "AMP 1-2a — BGA CAO Part66L Training Approval", "c": "Airworthiness"}, {"t": "AMP 1-6 — Inspector Disciplinary Procedure", "c": "Airworthiness"}, {"t": "AMP 1-10 — Importing and Exporting Aircraft", "c": "Airworthiness"}, {"t": "AMP 1-13 — Registration Procedure for Sailplanes", "c": "Airworthiness"}, {"t": "BGA Standard Repairs — Section 2 (Dope and Fabric Work)", "c": "Fabric"}, {"t": "BGA Standard Repairs — Section 4 (Miscellaneous Repairs)", "c": "Construction"}, {"t": "AMP 1-14 — Self Declared Maintenance Programme", "c": "Airworthiness"}, {"t": "AMP 1-15 — Acceptable Materials and Parts", "c": "Airworthiness"}, {"t": "AMP 2-1 — A Conditions Flight", "c": "Airworthiness"}, {"t": "AMP 2-2 — BGA C of A Renewal", "c": "Airworthiness"}, {"t": "AMP 2-3 — Modification of Non-Part 21 Gliders", "c": "Airworthiness"}, {"t": "AMP 2-4 — NARC Renewal", "c": "Airworthiness"}, {"t": "AMP 2-5 — Certifying a BGA Glider", "c": "Airworthiness"}, {"t": "AMP 4-7 — Flying Control Cables (BGA)", "c": "Airworthiness"}, {"t": "CS-STAN Issue 4 — Standard Changes and Repairs", "c": "Construction"}, {"t": "AMP 2-5 — BGA Certification Process (Non-Part 21)", "c": "Airworthiness"}, {"t": "AMP — Motor Glider Engine Inspection and Repair", "c": "Airworthiness"}, {"t": "BGA Standard Repairs — Section 5 (Instrument Repairs)", "c": "Construction"}, {"t": "BGA Standard Repairs — Section 6 (Weighing)", "c": "Airworthiness"}, {"t": "A Speck in the Sky", "c": "Books"}, {"t": "A Travers Les Nuages", "c": "Books"}, {"t": "Abc of Gliding and Sailflying", "c": "Books"}, {"t": "About Gliding", "c": "Books"}, {"t": "Accidents Happen Sample", "c": "Books"}, {"t": "Advanced Soaring", "c": "Books"}, {"t": "Advanced Soaring Made Easy", "c": "Books"}, {"t": "Adventurs of a Half Baked Chicken Hearted Granny Glider Pilot", "c": "Books"}, {"t": "Aerobatics Explained Sample", "c": "Books"}, {"t": "Airborne for Pleasure", "c": "Books"}, {"t": "Aircraft", "c": "Books"}, {"t": "Airdays", "c": "Books"}, {"t": "An Ancient Air", "c": "Books"}, {"t": "An Introduction to Gliding", "c": "Books"}, {"t": "Another Icarus Sample", "c": "Books"}, {"t": "Arrows of Fortune", "c": "Books"}, {"t": "Arrows of Fortune Sample", "c": "Books"}, {"t": "Aviation Sample", "c": "Books"}, {"t": "Aviator Extraordinaire Sample", "c": "Books"}, {"t": "Beginning Gliding Sample", "c": "Books"}, {"t": "Bga Journal January 1931", "c": "Books"}, {"t": "Birdflight as the Basis of Aviation", "c": "Books"}, {"t": "British Gliders and Sailplanes 1922 1970 Sample", "c": "Books"}, {"t": "British Gliding Clubs Directory", "c": "Books"}, {"t": "British Soaring Yearbook 1981", "c": "Books"}, {"t": "British Soaring Yearbook 1982 83", "c": "Books"}, {"t": "British Soaring Yearbook 1984 85", "c": "Books"}, {"t": "British Soaring Yearbook 1986 87", "c": "Books"}, {"t": "Bronze Beyond Sample", "c": "Books"}, {"t": "Clear Air Turbulence Sample", "c": "Books"}, {"t": "Cloud Reading for Pilots Sample", "c": "Books"}, {"t": "Cloud Study Sample", "c": "Books"}, {"t": "Club Flying and Gliding", "c": "Books"}, {"t": "Combat and Competition", "c": "Books"}, {"t": "Come Gliding with Me", "c": "Books"}, {"t": "Cross Country Soaring", "c": "Books"}, {"t": "Delta Papa Sample", "c": "Books"}, {"t": "Derek Piggott on Gliding Sample", "c": "Books"}, {"t": "Dying High", "c": "Books"}, {"t": "Elementary Gliding", "c": "Books"}, {"t": "First Through the Clouds", "c": "Books"}, {"t": "Flight Without Power", "c": "Books"}, {"t": "Flying Training in Gliders", "c": "Books"}, {"t": "Free as a Bird Sample", "c": "Books"}, {"t": "Further Outlook", "c": "Books"}, {"t": "Gleit Und Segelflugzeugen", "c": "Books"}, {"t": "Glider Flying", "c": "Books"}, {"t": "Glider Maintenance Manual", "c": "Books"}, {"t": "Glider Pilot", "c": "Books"}, {"t": "Gliders and Sailplanes of the World", "c": "Books"}, {"t": "Gliding", "c": "Books"}, {"t": "Gliding 1931", "c": "Books"}, {"t": "Gliding Clubs", "c": "Books"}, {"t": "Gliding Competitively Sample", "c": "Books"}, {"t": "Gliding From Passenger to Pilot", "c": "Books"}, {"t": "Gliding Safety Sample", "c": "Books"}, {"t": "Gliding Soaring Sportsmans Library", "c": "Books"}, {"t": "Gliding a Handbook on Soaring Flight Sample", "c": "Books"}, {"t": "Gliding and Advanced Soaring Sample", "c": "Books"}, {"t": "Gliding and Motorless Flight", "c": "Books"}, {"t": "Gliding and Power Flying", "c": "Books"}, {"t": "Gliding and Sail Planing", "c": "Books"}, {"t": "Gliding and Soaring", "c": "Books"}, {"t": "Gliding and Soaring Flight", "c": "Books"}, {"t": "Gliding and Soaring Simply Explained", "c": "Books"}, {"t": "Gliding in 8 Days", "c": "Books"}, {"t": "Go Gliding", "c": "Books"}, {"t": "Going Solo Sample", "c": "Books"}, {"t": "Goodhart Sample", "c": "Books"}, {"t": "Hanna Reitsch Sample", "c": "Books"}, {"t": "Happy Landings", "c": "Books"}, {"t": "Happy to Fly Sample", "c": "Books"}, {"t": "Hold Fast to Your Dreams Sample", "c": "Books"}, {"t": "Into the Blue", "c": "Books"}, {"t": "Jane s World Sailplanes", "c": "Books"}, {"t": "John Goes Gliding", "c": "Books"}, {"t": "Kronfeld on Gliding and Soaring", "c": "Books"}, {"t": "Maloja Wind", "c": "Books"}, {"t": "Manual of Gliding", "c": "Books"}, {"t": "Meteorology", "c": "Books"}, {"t": "Meteorology and Flight Sample", "c": "Books"}, {"t": "Meteorology for Glider Pilots Sample", "c": "Books"}, {"t": "Motorless Flight", "c": "Books"}, {"t": "Mountain Flying Talgarth", "c": "Books"}, {"t": "New Soaring Pilot Sample", "c": "Books"}, {"t": "On Being a Bird", "c": "Books"}, {"t": "Percy Pilchter and the Challenge of Flight Sample", "c": "Books"}, {"t": "Pilots Weather Sample", "c": "Books"}, {"t": "Pioneers to Partners Bristish Aircraft Since 1945 Sample", "c": "Books"}, {"t": "Playground in the Sky", "c": "Books"}, {"t": "Q a Questions for Glider Pilots with Answers", "c": "Books"}, {"t": "Sailplanes", "c": "Books"}, {"t": "Sailplanes 1920 1945 Sample", "c": "Books"}, {"t": "Sailplanes 1945 1965 Sample", "c": "Books"}, {"t": "Sailplanes 1965 2000 Sample", "c": "Books"}, {"t": "Sailplanes Soaring", "c": "Books"}, {"t": "Sailplanes by Schweizer Sample", "c": "Books"}, {"t": "Sails in the Sky", "c": "Books"}, {"t": "Sea Breeze and Local Wind Sample", "c": "Books"}, {"t": "Silent Flight", "c": "Books"}, {"t": "Sir George Cayley s Aeronautics 1796 1855 Sample", "c": "Books"}, {"t": "Slingsby Sailplanes", "c": "Books"}, {"t": "Soaring Across Country", "c": "Books"}, {"t": "Soaring Flight", "c": "Books"}, {"t": "Soaring at Usk", "c": "Books"}, {"t": "Tackle Gliding This Way", "c": "Books"}, {"t": "Take Up Slack", "c": "Books"}, {"t": "Teaching Harry to Fly", "c": "Books"}, {"t": "The Abc of Gliding", "c": "Books"}, {"t": "The Aero Manual", "c": "Books"}, {"t": "The Arctic Lite Guide to Gliding", "c": "Books"}, {"t": "The Art of Soaring Flight", "c": "Books"}, {"t": "The Beauty of Gliding", "c": "Books"}, {"t": "The Bga Journal August 1930", "c": "Books"}, {"t": "The British Gliding Association Handbook", "c": "Books"}, {"t": "The British Gliding Association Manual Sample", "c": "Books"}, {"t": "The Complete Soaring Guide", "c": "Books"}, {"t": "The Eye of the Wind Sample", "c": "Books"}, {"t": "The Glider Pilot s Manual 2nd Edition Sample", "c": "Books"}, {"t": "The Gliding Book", "c": "Books"}, {"t": "The Hand Bookof Glider Aerobatics", "c": "Books"}, {"t": "The Life of a Genius Sample", "c": "Books"}, {"t": "The Long Flight", "c": "Books"}, {"t": "The Manual for Elementary Flying Istruction in Two Seater Gliders", "c": "Books"}, {"t": "The Paths of Soaring Flight", "c": "Books"}, {"t": "The Playtypus Papers", "c": "Books"}, {"t": "The Powerless Ones Gliding in Peace and War", "c": "Books"}, {"t": "The Scottish Gliding Union", "c": "Books"}, {"t": "The Silent Wing", "c": "Books"}, {"t": "The Sky My Kingdom", "c": "Books"}, {"t": "The Soaring Pilot", "c": "Books"}, {"t": "The Soaring Pilot s Manual Sample", "c": "Books"}, {"t": "The Solo Glider Pilot", "c": "Books"}, {"t": "The Sowreys", "c": "Books"}, {"t": "The Story Essex and Suffolk", "c": "Books"}, {"t": "The Story of Gliding Sample", "c": "Books"}, {"t": "The Story of the Black Mountains Gliding Club 2007", "c": "Books"}, {"t": "The Theory of Modern Cross Country Gliding", "c": "Books"}, {"t": "The Wooden Sword", "c": "Books"}, {"t": "The Woolacombe Bird", "c": "Books"}, {"t": "The World s Sailplanes", "c": "Books"}, {"t": "The Worlds Sailplanes Vol 2", "c": "Books"}, {"t": "Theory and Technique of Soaring", "c": "Books"}, {"t": "Theory of Flight for Glider Pilots", "c": "Books"}, {"t": "Tiger in the Sky", "c": "Books"}, {"t": "Understanding Flying Weather Sample", "c": "Books"}, {"t": "Understanding Gliding Sample", "c": "Books"}, {"t": "Where No Birds Fly", "c": "Books"}, {"t": "Whispering Wings", "c": "Books"}, {"t": "Winning on the Wind", "c": "Books"}, {"t": "Wk Root This Gliding", "c": "Books"}, {"t": "Wk Root a Glider Pilot Bold 3rd Edition Wally Kahn", "c": "Books"}, {"t": "Youth on the Wing", "c": "Books"}];
+const CATS = ['All','Wood','Fabric','Adhesives','Airworthiness','Construction','Types','Books'];
 
+const listEl = document.getElementById('archive-list');
+const searchEl = document.getElementById('archive-search');
+const filtersEl = document.getElementById('filters');
+const emptyEl = document.getElementById('archive-empty');
+let activeCat = 'All';
+
+document.getElementById('archive-count').textContent =
+  CATALOGUE.length + ' reference items · documents, procedures and vintage books';
+
+CATS.forEach(c => {
+  const b = document.createElement('button');
+  b.className = 'filter' + (c === 'All' ? ' active' : '');
+  b.textContent = c;
+  b.addEventListener('click', () => {
+    activeCat = c;
+    filtersEl.querySelectorAll('.filter').forEach(f => f.classList.toggle('active', f.textContent === c));
+    renderList();
+  });
+  filtersEl.appendChild(b);
+});
+
+function renderList() {
+  const q = searchEl.value.trim().toLowerCase();
+  listEl.innerHTML = '';
+  let shown = 0;
+  for (const item of CATALOGUE) {
+    if (activeCat !== 'All' && item.c !== activeCat) continue;
+    if (q && !item.t.toLowerCase().includes(q)) continue;
+    shown++;
+    const li = document.createElement('li');
+    const title = document.createElement('span');
+    title.textContent = item.t;
+    const right = document.createElement('span');
+    right.style.display = 'flex'; right.style.gap = '8px'; right.style.alignItems = 'baseline';
+    const tag = document.createElement('span');
+    tag.className = 'cat-tag'; tag.textContent = item.c;
+    const ask = document.createElement('button');
+    ask.className = 'ask-btn'; ask.textContent = 'Ask Alf';
+    ask.setAttribute('aria-label', 'Ask Alf about ' + item.t);
+    ask.addEventListener('click', () => {
+      const prompt = item.c === 'Books'
+        ? `What does "${item.t}" in the collection cover? Give me a short overview.`
+        : `What does "${item.t}" cover, and when would I reach for it?`;
+      inputEl.value = prompt;
+      closeDrawer();
+      inputEl.focus();
+      autoGrow();
+    });
+    right.appendChild(tag); right.appendChild(ask);
+    li.appendChild(title); li.appendChild(right);
+    listEl.appendChild(li);
+  }
+  emptyEl.style.display = shown ? 'none' : 'block';
+}
+searchEl.addEventListener('input', renderList);
+renderList();
+
+/* Mobile drawer */
+const archiveCol = document.getElementById('archive-col');
+const scrim = document.getElementById('drawer-scrim');
+function openDrawer(){ archiveCol.classList.add('open'); scrim.classList.add('open'); }
+function closeDrawer(){ archiveCol.classList.remove('open'); scrim.classList.remove('open'); }
+document.getElementById('archive-toggle').addEventListener('click', openDrawer);
+document.getElementById('archive-close').addEventListener('click', closeDrawer);
+scrim.addEventListener('click', closeDrawer);
+
+/* ============ Chat ============ */
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('user-input');
+const sendBtn = document.getElementById('send-btn');
+const chipsEl = document.getElementById('chips');
+const heroEl = document.getElementById('hero');
 let conversationHistory = [];
 
-function scrollBottom() {
-  window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
-}
+function autoGrow(){ inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,160)+'px'; }
+inputEl.addEventListener('input', autoGrow);
 
-function addMessage(role, text, sources, sourceDetails) {
+function scrollBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function addMessage(role, text, sources, sourceDetails, isError) {
   const div = document.createElement('div');
-  div.className = `message ${role}`;
+  div.className = 'message ' + role + (isError ? ' error' : '');
 
   if (role === 'assistant') {
-    div.innerHTML = text.replace(/\n/g, '<br>');
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    div.innerHTML = esc(text).replace(/\n/g, '<br>');
 
     if (sourceDetails && sourceDetails.length > 0) {
       const src = document.createElement('div');
       src.className = 'source-line';
-      const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      src.innerHTML = '<strong>Archive sources consulted:</strong><br>' +
+      src.innerHTML = '<strong>ARCHIVE SOURCES CONSULTED</strong><br>' +
         sourceDetails.map(s => {
           let line = `<span>› ${esc(s.label)}`;
           if (s.url) line += ` — <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.urlName || 'authoritative copy')} ↗</a>`;
-          else line += ` <em>(held in the Archive — see caveats above for the definitive source)</em>`;
+          else line += ` <em>(held in the Archive — verify against the definitive source)</em>`;
           return line + '</span>';
         }).join('<br>');
       div.appendChild(src);
     } else if (sources && sources.length > 0) {
       const src = document.createElement('div');
       src.className = 'source-line';
-      src.innerHTML = '<strong>Archive sources consulted:</strong><br>' +
-        sources.map(s => `<span>› ${s}</span>`).join('<br>');
+      src.innerHTML = '<strong>ARCHIVE SOURCES CONSULTED</strong><br>' +
+        sources.map(s => `<span>› ${esc(s)}</span>`).join('<br>');
       div.appendChild(src);
     }
 
-    // Action buttons
-    const actions = document.createElement('div');
-    actions.className = 'message-actions';
+    if (!isError) {
+      const actions = document.createElement('div');
+      actions.className = 'message-actions';
 
-    // Download
-    const dlBtn = document.createElement('a');
-    dlBtn.className = 'action-btn';
-    dlBtn.innerHTML = '⬇ Download';
-    dlBtn.href = '#';
-    dlBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
-      const blob = new Blob([text + srcText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'alf-kirby-response.txt';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-    actions.appendChild(dlBtn);
-
-    // Copy
-    const copyBtn = document.createElement('a');
-    copyBtn.className = 'action-btn';
-    copyBtn.innerHTML = '⎘ Copy';
-    copyBtn.href = '#';
-    copyBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
-      navigator.clipboard.writeText(text + srcText).then(() => {
-        copyBtn.innerHTML = '✓ Copied';
-        setTimeout(() => copyBtn.innerHTML = '⎘ Copy', 2000);
+      const dlBtn = document.createElement('a');
+      dlBtn.className = 'action-btn'; dlBtn.textContent = '⬇ Download'; dlBtn.href = '#';
+      dlBtn.addEventListener('click', e => {
+        e.preventDefault();
+        const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
+        const blob = new Blob([text + srcText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'alf-kirby-response.txt'; a.click();
+        URL.revokeObjectURL(url);
       });
-    });
-    actions.appendChild(copyBtn);
+      actions.appendChild(dlBtn);
 
-    // WhatsApp
-    const waBtn = document.createElement('a');
-    waBtn.className = 'action-btn';
-    waBtn.innerHTML = '✉ WhatsApp';
-    waBtn.target = '_blank';
-    const waText = encodeURIComponent(
-      'From Alf Kirby — The Glider Workshop Archive:\n\n' +
-      text.slice(0, 800) + (text.length > 800 ? '...' : '') +
-      '\n\nhttps://thecast.chat/archivist.html'
-    );
-    waBtn.href = `https://wa.me/?text=${waText}`;
-    actions.appendChild(waBtn);
+      const copyBtn = document.createElement('a');
+      copyBtn.className = 'action-btn'; copyBtn.textContent = '⎘ Copy'; copyBtn.href = '#';
+      copyBtn.addEventListener('click', e => {
+        e.preventDefault();
+        const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
+        navigator.clipboard.writeText(text + srcText).then(() => {
+          copyBtn.textContent = '✓ Copied';
+          setTimeout(() => copyBtn.textContent = '⎘ Copy', 2000);
+        });
+      });
+      actions.appendChild(copyBtn);
 
-    // Gmail
-    const emailBtn = document.createElement('a');
-    emailBtn.className = 'action-btn';
-    emailBtn.innerHTML = '@ Gmail';
-    emailBtn.target = '_blank';
-    const srcText2 = sources && sources.length ? '\nSources: ' + sources.join(', ') : '';
-    const gmailBody = encodeURIComponent(
-      'From Alf Kirby — The Glider Workshop Archive:\n\n' +
-      text + srcText2 +
-      '\n\nhttps://thecast.chat/archivist.html'
-    );
-    emailBtn.href = `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent('Alf Kirby — Glider Workshop Archive')}&body=${gmailBody}`;
-    actions.appendChild(emailBtn);
+      const waBtn = document.createElement('a');
+      waBtn.className = 'action-btn'; waBtn.textContent = '✉ WhatsApp'; waBtn.target = '_blank';
+      waBtn.href = 'https://wa.me/?text=' + encodeURIComponent(
+        'From Alf Kirby — The Glider Workshop Archive:\n\n' +
+        text.slice(0, 800) + (text.length > 800 ? '…' : '') +
+        '\n\nhttps://thecast.chat/archivist.html');
+      actions.appendChild(waBtn);
 
-    div.appendChild(actions);
+      const emailBtn = document.createElement('a');
+      emailBtn.className = 'action-btn'; emailBtn.textContent = '@ Email'; emailBtn.target = '_blank';
+      const srcText2 = sources && sources.length ? '\nSources: ' + sources.join(', ') : '';
+      emailBtn.href = 'https://mail.google.com/mail/?view=cm&fs=1&su=' +
+        encodeURIComponent('Alf Kirby — Glider Workshop Archive') + '&body=' +
+        encodeURIComponent('From Alf Kirby — The Glider Workshop Archive:\n\n' + text + srcText2 +
+        '\n\nhttps://thecast.chat/archivist.html');
+      actions.appendChild(emailBtn);
 
+      div.appendChild(actions);
+    }
   } else {
     div.textContent = text;
   }
@@ -746,229 +478,71 @@ function addMessage(role, text, sources, sourceDetails) {
   return div;
 }
 
-function showTyping() {
+function showTyping(){
   const div = document.createElement('div');
-  div.className = 'typing-dots';
-  div.id = 'typing';
+  div.className = 'typing-dots'; div.id = 'typing';
   div.innerHTML = '<span></span><span></span><span></span>';
-  messagesEl.appendChild(div);
-  scrollBottom();
+  messagesEl.appendChild(div); scrollBottom();
 }
-
-function hideTyping() {
-  const el = document.getElementById('typing');
-  if (el) el.remove();
-}
+function hideTyping(){ const el = document.getElementById('typing'); if (el) el.remove(); }
 
 async function sendMessage() {
   const text = inputEl.value.trim();
-  if (!text) return;
-
-  inputEl.value = '';
-  inputEl.style.height = 'auto';
-  sendBtn.disabled = true;
-
+  if (!text || sendBtn.disabled) return;
+  heroEl.classList.add('collapsed');
+  chipsEl.style.display = 'none';
   addMessage('user', text);
   conversationHistory.push({ role: 'user', content: text });
-
+  inputEl.value = ''; autoGrow();
+  sendBtn.disabled = true;
   showTyping();
-
   try {
     const res = await fetch('/.netlify/functions/archivist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: conversationHistory })
     });
-
-    const data = await res.json();
     hideTyping();
-
-    if (data.error) {
-      addMessage('system-note', 'Something went wrong in the archive room: ' + data.error);
-    } else {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.reply) {
       addMessage('assistant', data.reply, data.sources, data.sourceDetails);
       conversationHistory.push({ role: 'assistant', content: data.reply });
+    } else {
+      throw new Error('empty reply');
     }
-  } catch (e) {
+  } catch (err) {
     hideTyping();
-    addMessage('system-note', 'Could not reach the archive: ' + e.message);
+    addMessage('assistant',
+      "That one's timed out on me, sorry. If tha asked about the books and airworthiness in the same breath, try them one at a time — big compound questions can overrun. Otherwise give it a moment and ask again.",
+      null, null, true);
+  } finally {
+    sendBtn.disabled = false;
+    inputEl.focus();
   }
-
-  sendBtn.disabled = false;
-  inputEl.focus();
 }
 
 sendBtn.addEventListener('click', sendMessage);
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
 
-inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
+chipsEl.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    inputEl.value = chip.textContent;
     sendMessage();
-  }
-});
-
-// Auto-resize textarea
-inputEl.addEventListener('input', () => {
-  inputEl.style.height = 'auto';
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
-});
-
-// ── Dynamic archive contents ──────────────────────────────────────────────────
-const REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
-const FOLDERS = [
-  'BGA_Standard_Repairs',
-  'wood_construction',
-  'adhesives_and_finishing',
-  'composite_repair',
-  'fabric_covering',
-  'general_airworthiness',
-  'gliding_history_and_literature'
-];
-
-const FOLDER_LABELS = {
-  'BGA_Standard_Repairs': 'BGA Standard Repairs',
-  'wood_construction': 'Wood Construction',
-  'adhesives_and_finishing': 'Adhesives & Finishing',
-  'composite_repair': 'Composite Repair',
-  'fabric_covering': 'Fabric Covering',
-  'general_airworthiness': 'General Airworthiness',
-  'gliding_history_and_literature': 'Gliding History & Literature'
-};
-
-function formatFileName(name) {
-  return name
-    .replace(/\.pdf$|\.txt$/, '')
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase())
-    .replace(/Bga/g, 'BGA')
-    .replace(/Grp/g, 'GRP')
-    .replace(/Anc/g, 'ANC')
-    .replace(/Ac43/g, 'AC43')
-    .replace(/Cae/g, 'CAE');
-}
-
-const CATEGORY_ICONS = {
-  'BGA_Standard_Repairs': '📋',
-  'wood_construction': '🪵',
-  'adhesives_and_finishing': '🔧',
-  'composite_repair': '🔩',
-  'fabric_covering': '🧵',
-  'general_airworthiness': '✈️',
-  'gliding_history_and_literature': '📖'
-};
-
-async function loadArchiveContents() {
-  const list = document.getElementById('archive-list');
-  try {
-    const res = await fetch('/.netlify/functions/archive-contents');
-    const results = await res.json();
-
-    list.innerHTML = '';
-    let totalCount = 0;
-    const BASE_RAW = 'https://raw.githubusercontent.com/Kai-C-Clarke/vintage-glider-knowledge-base/main/';
-
-    // Add search box
-    const searchDiv = document.createElement('div');
-    searchDiv.className = 'archive-search';
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.placeholder = 'Filter documents… e.g. spruce, aerodux, altimeter';
-    searchInput.addEventListener('input', () => filterDocs(searchInput.value));
-    searchDiv.appendChild(searchInput);
-    list.parentElement.insertBefore(searchDiv, list);
-
-    for (const { folder, docs } of results) {
-      if (!docs || docs.length === 0) continue;
-
-      const group = document.createElement('div');
-      group.className = 'category-group';
-      group.dataset.folder = folder;
-
-      // Category toggle button
-      const toggle = document.createElement('button');
-      toggle.className = 'category-toggle';
-      toggle.innerHTML = `
-        <span class="category-icon">${CATEGORY_ICONS[folder] || '📄'}</span>
-        <span class="category-name">${FOLDER_LABELS[folder] || folder}</span>
-        <span class="category-count">${docs.length}</span>
-        <span class="category-arrow">▸</span>
-      `;
-      toggle.addEventListener('click', () => {
-        toggle.classList.toggle('open');
-        docsDiv.classList.toggle('open');
-      });
-      group.appendChild(toggle);
-
-      // Docs list
-      const docsDiv = document.createElement('div');
-      docsDiv.className = 'category-docs';
-
-      for (const name of docs) {
-        const li = document.createElement('li');
-        li.dataset.name = formatFileName(name).toLowerCase();
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'doc-name';
-        nameSpan.textContent = formatFileName(name);
-        li.appendChild(nameSpan);
-
-        const rawUrl = `${BASE_RAW}${folder}/${name}`;
-        const dl = document.createElement('a');
-        dl.className = 'dl-link';
-        dl.textContent = '↓';
-        dl.href = rawUrl;
-        dl.target = '_blank';
-        dl.title = 'Download ' + formatFileName(name);
-        li.appendChild(dl);
-
-        docsDiv.appendChild(li);
-        totalCount++;
-      }
-
-      group.appendChild(docsDiv);
-      list.appendChild(group);
-    }
-
-    const countEl = document.getElementById('doc-count');
-    if (countEl) countEl.textContent = totalCount + ' documents';
-
-  } catch (e) {
-    list.innerHTML = '<li>Could not load archive contents.</li>';
-    console.error('Archive load error:', e);
-  }
-}
-
-function filterDocs(query) {
-  const q = query.toLowerCase().trim();
-  const groups = document.querySelectorAll('.category-group');
-  let anyVisible = false;
-
-  groups.forEach(group => {
-    const docs = group.querySelectorAll('li');
-    let groupVisible = false;
-    docs.forEach(li => {
-      const match = !q || li.dataset.name.includes(q);
-      li.classList.toggle('hidden', !match);
-      if (match) groupVisible = true;
-    });
-
-    // Auto-expand categories with matches, collapse empty ones
-    const toggle = group.querySelector('.category-toggle');
-    const docsDiv = group.querySelector('.category-docs');
-    if (q && groupVisible) {
-      toggle.classList.add('open');
-      docsDiv.classList.add('open');
-    } else if (q && !groupVisible) {
-      toggle.classList.remove('open');
-      docsDiv.classList.remove('open');
-    }
-    group.style.display = groupVisible || !q ? '' : 'none';
-    if (groupVisible) anyVisible = true;
   });
-}
+});
 
-loadArchiveContents();
+document.getElementById('new-chat-btn').addEventListener('click', () => {
+  conversationHistory = [];
+  messagesEl.innerHTML = '';
+  heroEl.classList.remove('collapsed');
+  chipsEl.style.display = '';
+  inputEl.value = ''; autoGrow(); inputEl.focus();
+});
 
+inputEl.focus();
 </script>
 </body>
 </html>
