@@ -537,25 +537,42 @@ async function sendMessage() {
   inputEl.value = ''; autoGrow();
   sendBtn.disabled = true;
   showTyping();
-  try {
+  async function askOnce() {
     const res = await fetch('/.netlify/functions/archivist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: conversationHistory })
     });
-    hideTyping();
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    if (data.reply) {
-      addMessage('assistant', data.reply, data.sources, data.sourceDetails);
-      conversationHistory.push({ role: 'assistant', content: data.reply });
-    } else {
-      throw new Error('empty reply');
+    if (!data.reply) throw new Error('empty reply');
+    return data;
+  }
+  try {
+    let data;
+    try {
+      data = await askOnce();
+    } catch (firstErr) {
+      // One automatic retry: warm instances have the indexes and books cached,
+      // so a second attempt usually comes back well inside the limit.
+      const note = document.createElement('div');
+      note.className = 'typing-note';
+      note.textContent = 'Taking longer than usual — having another look…';
+      note.style.cssText = 'font-size:13px;color:var(--muted);padding:2px 4px 8px;';
+      messagesEl.appendChild(note); scrollBottom();
+      try {
+        data = await askOnce();
+      } finally {
+        note.remove();
+      }
     }
+    hideTyping();
+    addMessage('assistant', data.reply, data.sources, data.sourceDetails);
+    conversationHistory.push({ role: 'assistant', content: data.reply });
   } catch (err) {
     hideTyping();
     addMessage('assistant',
-      "That one's timed out on me, sorry. If tha asked about the books and airworthiness in the same breath, try them one at a time — big compound questions can overrun. Otherwise give it a moment and ask again.",
+      "That one's timed out on me twice, sorry — it happens when the Archive machinery runs long, and it's nowt tha's done wrong. Give it a minute and ask again. If the question mixes the books and airworthiness together, asking them separately can help while we sort the speed out.",
       null, null, true);
   } finally {
     sendBtn.disabled = false;
