@@ -85,6 +85,8 @@ When citing any BGA Airworthiness Maintenance Procedure (AMP), always note that 
 
 Do not speculate beyond what the documents contain. Do not use exclamation marks. Refer to the collection as "the Glider Workshop Archive" or simply "the Archive."
 
+ANSWER LENGTH: Lead with the most useful facts and stop. For a specific question, answer it directly. For a broad topic, give the key points from the best source and OFFER to go deeper ("Ask me about X if tha wants the detail") rather than surveying everything the Archive holds — a focused answer the reader gets quickly beats a comprehensive one that arrives slowly. Never pad. Aim for well under half a page unless the question genuinely needs more.
+
 NUMERIC LIMITATIONS RULE — absolute. Operating figures (VNE and other speeds, weights, C of G limits, control deflections, pressures, weak link values) may be stated ONLY if the figure appears in archive material provided in this conversation. Never supply a figure from memory, however confident you are. Never name or cite an archive record that was not actually provided or returned by search in this conversation — citing a record you have not been shown is fabrication. If the search returns nothing that answers the question, say plainly that the Archive search did not return the relevant document this time, suggest the user rephrase or try again, and point to the authoritative source (Flight Manual, BGA library). An honest "not retrieved" is always acceptable; a guessed figure can overstress an aircraft.
 
 CONSTRUCTION AND MATERIALS RULE — absolute, same weight as the numeric rule above. Statements about what an aircraft type is MADE OF (wood, GRP/glass fibre, metal, mixed construction; which parts are which material) may be made ONLY if a retrieved archive document states it for that type. Never assert or assume a type's construction from memory, from the manufacturer's other types, or from the era — many manufacturers built wood, metal and glass types side by side, and a wrong construction assertion sends the entire repair down the wrong path. If no retrieved document states the construction, say plainly that the Archive material in front of you doesn't confirm the type's construction, ask the user to confirm what the structure is at the damage site, and point to the type's Flight Manual or data sheet. (Founding incident, 6/8/26: the SHK-1 was wrongly described as having a GRP fuselage — it is of wood construction with additional glass-fibre sections — steering a fuselage repair question into the wrong repair territory entirely.)
@@ -298,8 +300,40 @@ const FILE_INDEX = [
 
 function selectDocuments(query) {
   const q = query.toLowerCase();
+  // SYNONYM TABLE (7/8/26, Jon's design, decision recorded 7/8): query-side
+  // damage-language -> remedy-language expansion. OWN CURATED table, never an
+  // internet thesaurus — rows are JRS-verifiable domain associations, grown one
+  // row per field report like the golden set. Synonym hits score HALF a direct
+  // hit so direct matches always outrank. Keep it small: precision beats recall
+  // in this system (latency ceiling, 6/8 lesson).
+  const SYNONYMS = {
+    'hole':      ['ply repair', 'skin repair', 'patch', 'damage'],      // row 1: 6/8 SHK-hole report
+    'weigh':     ['weighing'],                                          // row 2: 6/8 weighing report
+    'reweigh':   ['weighing', 'periodicity'],
+    'puncture':  ['ply repair', 'skin repair', 'patch'],
+    'crack':     ['split', 'glue', 'repair'],
+    'cracked':   ['split', 'glue', 'repair'],
+    'tear':      ['fabric', 'patch'],
+    'ripped':    ['fabric', 'patch'],
+    'torn':      ['fabric', 'patch'],
+    'broken':    ['repair', 'splice'],
+    'snapped':   ['repair', 'splice'],
+    'rot':       ['moisture', 'timber', 'wood'],
+    'rotten':    ['moisture', 'timber', 'wood'],
+    'dent':      ['damage', 'skin repair'],
+    'glue line': ['glue', 'joint'],
+    'cofg':      ['centre of gravity', 'balance'],
+    'c of g':    ['centre of gravity', 'balance'],
+  };
+  const expansions = [];
+  for (const [word, targets] of Object.entries(SYNONYMS)) {
+    if (q.includes(word)) expansions.push(...targets);
+  }
   const scored = FILE_INDEX.map(entry => {
-    const score = entry.keywords.filter(kw => q.includes(kw)).length;
+    const direct = entry.keywords.filter(kw => q.includes(kw)).length;
+    const viaSynonym = entry.keywords.filter(kw =>
+      expansions.some(x => kw.includes(x) || x.includes(kw))).length;
+    const score = direct + 0.5 * Math.min(viaSynonym, 2); // cap synonym influence
     return { ...entry, score };
   }).filter(e => e.score > 0)
     // Tie-break fix (6/8/26): JS stable sort previously broke score ties by
@@ -1183,7 +1217,7 @@ exports.handler = async function(event, context) {
 
     const response = await timer.time('anthropic', () => anthropicPost({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 1400,
       system: [{ type: 'text', text: ARCHIVIST_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: allMessages
     }));
@@ -1299,6 +1333,7 @@ exports.handler = async function(event, context) {
     // needed to see where the tail latency actually goes) -- Fable, 5/8/26.
     if (process.env.DEBUG_TIMING === '1' || (event.queryStringParameters && event.queryStringParameters.debug === '1')) {
       body._timing = timing;
+      body._timings = timing;
       if (fetchDocFailures.length > 0) body._docFetchFailures = fetchDocFailures;
       if (suspectedFalseFetchClaim) body._suspectedConfabulation = true;
       if (regeneratedOnDetect) body._regeneratedOnDetect = true;
