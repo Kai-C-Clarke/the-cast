@@ -5,7 +5,7 @@ sorted against the system's actual constraints by Claude the same day. The criti
 saw the presentation, not the plumbing — several proposals collide with permission
 boundaries and the launch-gate feature freeze, hence this sort.
 
-**Status: HELD until launch gates close** (wk- smoke tests + Jon's AMP corpus
+**Status: BUILT AND DEPLOYED 6/8/26** (commits 6fa0895e, a748e7a1) per Grok's revised v2 brief as amended: multilingual DROPPED (Jon's decision), per-answer boilerplate demoted (persistent strip carries the warning; answers carry citations), chips restricted to golden-set-verified strengths. Original tier notes below retained for history; portrait commissioning and character progress-state remain open Tier-2 items. (wk- smoke tests + Jon's AMP corpus
 decision). None of this touches archivist.js — it is all archivist.html territory —
 but it queues behind the gates rather than jumping them. The engine was stabilised
 6/8/26 (root-cause fetch fix, corpus guard, automated golden set); the page must
