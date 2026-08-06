@@ -1129,7 +1129,7 @@ exports.handler = async function(event, context) {
         `\n\nSTRICT RULES for using this material:\n` +
         `1. Summarise and paraphrase in your own words. This is the primary way to use this material.\n` +
         `2. At most ONE direct quotation, maximum 25 words, in quotation marks, clearly attributed to the book by name.\n` +
-        `3. Cite the location as "scan page ${'{N}'}" using the pdf_page number given above — NEVER state or infer a printed/book page number. This collection's printed page numbers are not yet verified and must not be presented to the reader.\n` +
+        `3. Cite the location using EXACTLY the phrase "scan page ${'{N}'}" with the pdf_page number given above. Never write a bare "page ${'{N}'}", "page ${'{N}'} of <book>", or any other page phrasing — the word "scan" must always be present, because this collection's printed page numbers are not verified and a bare page number would send the reader to the wrong page of the physical book.\n` +
         `4. Do not reproduce more of the text than needed to answer the question.\n` +
         `5. Tell the reader this comes from the Wally Kahn / BGA eBook Collection and that they can find the original at the source link provided in this system's sources panel — do not construct or guess a link yourself.`
       : '';
