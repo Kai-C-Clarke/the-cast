@@ -1159,7 +1159,7 @@ exports.handler = async function(event, context) {
       contextNote += `\n\nUser's question: ${latestQuery}`;
       userContent.push({ type: 'text', text: contextNote });
     } else if (failedLabels.length > 0) {
-      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. Answer from your general knowledge where you can, note which document the user should consult, and suggest they try again shortly.${retrievalManifest}${tnsNote}${referenceNote}${scannedTnsNote}${wkNote} User's question: ${latestQuery}` });
+      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. You may explain general context from your own knowledge, but you must NOT state any engineering specification, figure, limit, part number, or product recommendation (oil grades, torque values, dimensions, speeds, forces) from general knowledge — those must always come from a retrieved document. Name the document the user should consult, and suggest they try again shortly.${retrievalManifest}${tnsNote}${referenceNote}${scannedTnsNote}${wkNote} User's question: ${latestQuery}` });
     } else {
       userContent.push({ type: 'text', text: (tnsNote || referenceNote || scannedTnsNote || wkNote) ? `${tnsNote}${referenceNote}${scannedTnsNote}${wkNote}\n\nUser's question: ${latestQuery}` : latestQuery });
     }
