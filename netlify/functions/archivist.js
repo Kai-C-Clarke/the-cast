@@ -350,7 +350,11 @@ function selectDocuments(query) {
     // matched the word "overlap" itself, lost a 3-way tie to two generic
     // fabric docs). Ties now prefer the SHORTER keyword list — a reasonable
     // specificity proxy: focused documents carry focused keyword sets.
-    .sort((a, b) => (b.score - a.score) || (a.keywords.length - b.keywords.length));
+    // Tie-break order (7/8/26): score, then CURATION BOOST (current/JRS docs
+    // win ties against historic peers -- field report #8 showed equal-scoring
+    // generic 1970s entries beating boosted modern notes via the list-length
+    // rule), then shorter keyword list as the specificity proxy.
+    .sort((a, b) => (b.score - a.score) || ((b.boost || 0) - (a.boost || 0)) || (a.keywords.length - b.keywords.length));
   return scored.slice(0, 2);
 }
 
