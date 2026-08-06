@@ -210,8 +210,8 @@ const FILE_INDEX = [
 
   // Fabric
   { keywords: ['ceconite','fabric','covering','dope','nitrate','butyrate','polyester','rib stitching','heat shrink','repair','patch','panel','wing fabric','fuselage fabric','cellulose','damaged'], path: 'fabric_covering/ceconite_manual_101_text.txt', label: 'Ceconite Manual 101' },
-  { keywords: ['diatex','nitrate','butyrate','polyester','covering','form 205','recovering','fabric procedure','non-tautening','tautening','solo','cellulose','aluminium dope','topcoat','finish','repair','patch','panel','wing panel','ceconite repair'], path: 'fabric_covering/polyester_fabric_covering_reference_note_2026.txt', label: 'Polyester Fabric Covering — Reference Note (2026)' },
-  { keywords: ['overlap','patch overlap','3 inch','2 inch','unsupported','supported','repair patch','inter-rib','fabric repair','hole repair','ceconite repair','appendix e','new super seam','pinking shears'], path: 'fabric_covering/fabric_repair_patch_overlap_note_2026.txt', label: 'Fabric Repair Patch Overlap — Ceconite + BGA Practice (2026)' },
+  { keywords: ['diatex','nitrate','butyrate','polyester','covering','form 205','recovering','fabric procedure','non-tautening','tautening','solo','cellulose','aluminium dope','topcoat','finish','repair','patch','panel','wing panel','ceconite repair'], path: 'fabric_covering/polyester_fabric_covering_reference_note_2026.txt', boost: 1, label: 'Polyester Fabric Covering — Reference Note (2026)' },
+  { keywords: ['overlap','patch overlap','3 inch','2 inch','unsupported','supported','repair patch','inter-rib','fabric repair','hole repair','ceconite repair','appendix e','new super seam','pinking shears'], path: 'fabric_covering/fabric_repair_patch_overlap_note_2026.txt', boost: 1, label: 'Fabric Repair Patch Overlap — Ceconite + BGA Practice (2026)' },
 
   // BGA Compendium — General
   { keywords: ['compendium','general information','glue inspection','weighing','annual','mandatory','bga requirement','generic requirement'], path: 'general_airworthiness/BGA-Compendium-General-Information_text.txt', label: 'BGA Compendium — General Information' },
@@ -224,7 +224,7 @@ const FILE_INDEX = [
   // BGA Compendium — Type specific
   { keywords: ['schleicher','ka-6','ka6','k-8','k8','k-13','k13','ask','ka2','ka8','wood schleicher'], path: 'general_airworthiness/BGA-Compendium-Schleicher-Wood_text.txt', label: 'BGA Compendium — Schleicher Wood Types' },
   { keywords: ['schempp','hirth','shk','cirrus','standard cirrus','nimbus','duo discus','discus','ventus','janus'], path: 'general_airworthiness/BGA-Compendium-Schempp-Hirth_text.txt', label: 'BGA Compendium — Schempp-Hirth' },
-  { keywords: ['shk','shk-1','shk 1','shk fuselage','shk construction','shk repair','shk hole','shk damage','shk wood','shk grp'], path: 'general_airworthiness/SHK-1_construction_reference_2026.txt', label: 'SHK-1 Construction Reference Note (2026, JRS-verified)' },
+  { keywords: ['shk','shk-1','shk 1','shk fuselage','shk construction','shk repair','shk hole','shk damage','shk wood','shk grp'], path: 'general_airworthiness/SHK-1_construction_reference_2026.txt', boost: 1, label: 'SHK-1 Construction Reference Note (2026, JRS-verified)' },
   { keywords: ['swallow t45','t.45','t45 pilots','swallow pilots','swallow stall','swallow performance','swallow limits','swallow weight','swallow aerotow','swallow winch','swallow spin','swallow acrobatic'], path: 'glider-workshop/reference/type-docs/swallow-t45/ingest/records/swallow-t45-pilots-notes-technical-data.json', label: 'Slingsby T.45 Swallow — Pilots Notes & Technical Data' },
   { keywords: ['slingsby','prefect','tutor','swallow','skylark','capstan','kite','petrel','dart','t21','t38','t49','t51'], path: 'general_airworthiness/BGA-Compendium-Slingsby_text.txt', label: 'BGA Compendium — Slingsby' },
   { keywords: ['elliots','olympia','eon','olympia 2b','olympia 460','eon olympia'], path: 'general_airworthiness/BGA-Compendium-Elliots_text.txt', label: 'BGA Compendium — Elliots (Olympia)' },
@@ -264,7 +264,7 @@ const FILE_INDEX = [
   { keywords: ['harness','seat belt','belt','lap strap','shoulder harness'], path: 'general_airworthiness/AMP/amp_1-5_seat_harnesses_and_belts.txt', label: 'AMP 1-5 — Seat Harnesses and Belts' },
   { keywords: ['transponder','squawk','mode c','mode s','ssr','ads-b'], path: 'general_airworthiness/AMP/amp_1-7_transponder_maintenance.txt', label: 'AMP 1-7 — Transponder Maintenance' },
   { keywords: ['trailer','trailer maintenance','road trailer','transport'], path: 'general_airworthiness/AMP/amp_1-8_trailer_maintenance.txt', label: 'AMP 1-8 — Trailer Maintenance' },
-  { keywords: ['weighing','weight','balance','centre of gravity','cg','mass balance','weigh','weigh a glider','how to weigh','weigh my glider'], path: 'general_airworthiness/AMP/amp_1-9_glider_weighing.txt', label: 'AMP — Glider Weighing (v2, Jan 2024, current)' },
+  { keywords: ['weighing','weight','balance','centre of gravity','cg','mass balance','weigh','weigh a glider','how to weigh','weigh my glider'], path: 'general_airworthiness/AMP/amp_1-9_glider_weighing.txt', boost: 1, label: 'AMP — Glider Weighing (v2, Jan 2024, current)' },
   { keywords: ['battery','battery maintenance','lead acid','lithium','12v','electrolyte'], path: 'general_airworthiness/AMP/amp_1-11_battery_maintenance.txt', label: 'AMP 1-11 — Battery Maintenance' },
   { keywords: ['complex maintenance','complex repair','major repair'], path: 'general_airworthiness/AMP/amp_1-12_complex_maintenance.txt', label: 'AMP 1-12 — Complex Maintenance' },
   { keywords: ['part66l','part 66','training approval','bga cao','licence','category b','category a'], path: 'general_airworthiness/AMP/amp_1-2a_part66l_training_approval.txt', label: 'AMP 1-2a — BGA CAO Part66L Training Approval' },
@@ -308,6 +308,7 @@ function selectDocuments(query) {
   // in this system (latency ceiling, 6/8 lesson).
   const SYNONYMS = {
     'hole':      ['ply repair', 'skin repair', 'patch', 'damage'],      // row 1: 6/8 SHK-hole report
+    'cover':     ['covering', 'fabric', 'ceconite'],                    // row 18: 7/8 wing-covering report (catches cover/covered/covers/recover)
     'weigh':     ['weighing'],                                          // row 2: 6/8 weighing report
     'reweigh':   ['weighing', 'periodicity'],
     'puncture':  ['ply repair', 'skin repair', 'patch'],
@@ -333,7 +334,14 @@ function selectDocuments(query) {
     const direct = entry.keywords.filter(kw => q.includes(kw)).length;
     const viaSynonym = entry.keywords.filter(kw =>
       expansions.some(x => kw.includes(x) || x.includes(kw))).length;
-    const score = direct + 0.5 * Math.min(viaSynonym, 2); // cap synonym influence
+    let score = direct + 0.5 * Math.min(viaSynonym, 2); // cap synonym influence
+    // RECENCY/CURATION BOOST (7/8/26, field report #8 -- wing covering answered
+    // from 1970s Standard Repairs while the modern fabric docs sat unopened):
+    // entries carrying an explicit boost are the CURRENT or JRS-curated
+    // authority for their topic, and outrank historic peers whenever both
+    // match. The boost never fires on zero -- it cannot select an irrelevant
+    // document, only promote a relevant modern one above a relevant old one.
+    if (entry.boost && score > 0) score += entry.boost;
     return { ...entry, score };
   }).filter(e => e.score > 0)
     // Tie-break fix (6/8/26): JS stable sort previously broke score ties by
