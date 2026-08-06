@@ -945,6 +945,7 @@ function anthropicPost(payload) {
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 exports.handler = async function(event, context) {
+  const __handlerStart = Date.now();
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: '' };
   }
@@ -1210,7 +1211,15 @@ exports.handler = async function(event, context) {
     const FETCH_FAILURE_PHRASES = /\b(failed to load|wasn'?t retrieved|not retrieved|was not retrieved|were not retrieved|404|came back empty|not delivered|wasn'?t delivered|returned an error|couldn'?t (be )?retriev)/i;
     let suspectedFalseFetchClaim = failedLabels.length === 0 && relevantDocs.length > 0 && FETCH_FAILURE_PHRASES.test(reply);
     let regeneratedOnDetect = false;
-    if (suspectedFalseFetchClaim) {
+    // Time budget (6/8/26 latency fix): the corrective regeneration doubles the
+    // model calls. Fine when the first pass was quick; fatal when we're already
+    // deep into the ~26s gateway window — three 504s observed today (wk17, Q4,
+    // "spruce repair"). Past 12s elapsed, ship the original with the flag up
+    // rather than 504 the whole request. Real fix (tier parallelisation) is the
+    // next engine session.
+    if (suspectedFalseFetchClaim && (Date.now() - __handlerStart) > 12000) {
+      console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration SKIPPED — ${Date.now() - __handlerStart}ms already elapsed, would risk gateway timeout`);
+    } else if (suspectedFalseFetchClaim) {
       console.log(`[archivist][SUSPECTED-CONFABULATION] reply used fetch-failure language but all ${relevantDocs.length} FILE_INDEX doc(s) were actually fetched successfully (fetchedLabels: ${fetchedLabels.join(', ')})`);
       // Backstop (6/8/26): with the fetchRawUrl root cause fixed and the
       // always-present manifest in place, this should now fire rarely, if at
