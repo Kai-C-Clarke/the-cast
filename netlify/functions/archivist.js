@@ -560,11 +560,21 @@ function wkApplyChecksumGate(reply, wkResults) {
   let match;
   const spans = [];
   while ((match = quoteRe.exec(reply)) !== null) {
+    // Length limit enforced structurally, not just by prompt (6/8/26, wk11
+    // smoke test caught intermittent 30-word quotes): the snippet-only
+    // permission caps direct quotation at 25 words, so over-length quotes are
+    // stripped exactly like unverified ones.
+    if (match[1].split(/\s+/).length > 25) {
+      const span = wkStripSentenceContaining(reply, match.index, match.index + match[0].length);
+      spans.push(span);
+      flagged.push({ quote: match[1].slice(0, 100), citedPage: null, reason: 'over-length (>25 words)' });
+      continue;
+    }
     const citedPage = wkFindNearbyPageCitation(reply, match.index, match[0].length);
     if (!wkVerifyQuoteAgainstPage(match[1], citedPage, wkResults)) {
       const span = wkStripSentenceContaining(reply, match.index, match.index + match[0].length);
       spans.push(span);
-      flagged.push({ quote: match[1].slice(0, 100), citedPage });
+      flagged.push({ quote: match[1].slice(0, 100), citedPage, reason: 'unverified' });
     }
   }
   if (spans.length === 0) return { reply, flagged: [] };
