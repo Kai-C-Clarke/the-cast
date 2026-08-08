@@ -485,18 +485,39 @@ function wkCleanTitle(originalFilename) {
   return t;
 }
 
+// wkTitleSource records WHICH path produced the map, surfaced via ?debug=1.
+// Added 8/8/26 after the first version of this loader silently produced an
+// empty map in production and three rounds of reasoning-from-outside failed to
+// say why: one catch swallowing four distinct failure modes is not diagnosable.
+let wkTitleSource = 'not-attempted';
+
 async function loadWkTitles() {
   if (wkTitleMap) return wkTitleMap;
   try {
-    const bundled = readBundled('wk_manifest.json');
-    const body = bundled || (await githubApiRaw(WK_REPO, WK_MANIFEST_PATH)).body;
+    let body = readBundled('wk_manifest.json');
+    if (body) {
+      wkTitleSource = 'bundled';
+    } else {
+      const res = await githubApiRaw(WK_REPO, WK_MANIFEST_PATH);
+      if (!res || res.status !== 200 || !res.body) {
+        // A 404 body from the contents API is itself valid JSON
+        // ({"message":"Not Found"}), so it parses cleanly and only fails later
+        // on .filter — which is exactly how this failure stayed invisible.
+        // Check the status, never just the body.
+        throw new Error(`manifest fetch HTTP ${res && res.status}`);
+      }
+      body = res.body;
+      wkTitleSource = 'api';
+    }
     const manifest = JSON.parse(body);
+    if (!Array.isArray(manifest)) throw new Error('manifest is not an array');
     wkTitleMap = new Map(manifest
       .filter(b => b.slug && b.original_filename)
       .map(b => [b.slug, wkCleanTitle(b.original_filename)]));
-    console.log(`[archivist] wk- titles loaded: ${wkTitleMap.size}`);
+    console.log(`[archivist] wk- titles loaded from ${wkTitleSource}: ${wkTitleMap.size}`);
   } catch (e) {
     // Non-fatal by design: a missing manifest costs nicer labels, not answers.
+    wkTitleSource = `failed: ${e.message}`;
     console.log(`[archivist] wk- manifest unavailable (${e.message}) — falling back to slug-derived titles`);
     wkTitleMap = new Map();
   }
@@ -1610,6 +1631,8 @@ export default async function handler(req, context) {
           if (fetchDocFailures.length > 0) done._docFetchFailures = fetchDocFailures;
           if (suspectedFalseFetchClaim) done._suspectedConfabulation = true;
           if (writer.gated) done._wkGated = true;
+          done._wkTitles = wkTitleMap ? wkTitleMap.size : 0;
+          done._wkTitleSource = wkTitleSource;
           if (wkFlagged.length > 0) done._wkFlagged = wkFlagged;
         }
         send(done);
