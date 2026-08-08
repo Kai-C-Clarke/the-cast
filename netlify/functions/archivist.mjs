@@ -187,6 +187,23 @@ function isScrapeGarbage(text) {
 // ── File index ────────────────────────────────────────────────────────────────
 
 const FILE_INDEX = [
+// PRUNED 8/8/26 — NINE DUPLICATE AMP ENTRIES REMOVED.
+// Nine AMP documents were listed TWICE: once as the re-ingested
+// general_airworthiness/AMP/*.txt and once as a
+// glider-workshop/reference/AMP/ingest/records/*.json record. Because
+// selectDocuments returns only TWO documents, a query on any of those topics
+// filled BOTH slots with the same document and crowded out the second-best
+// distinct source entirely — verified on all nine before removal. This was a
+// retrieval defect, not just a doubled sources panel.
+// THE .txt VERSIONS WERE KEPT, on evidence rather than on the assumption that
+// the newer ingest pipeline wins: they were re-ingested 6/8/26 from the BGA
+// CDN (the .json records date from 17/7/26), they are consistently the fuller
+// extraction, and they carry a provenance header — source URL, PDF filename and
+// an explicit revision-control warning — inside the text the model actually
+// sees. None of the nine .json records carried annotations, uncertainties or
+// verified_by, so the ingest-record machinery added nothing for these nine.
+// The remaining glider-workshop/*.json entries are NOT duplicates and stay.
+
   // BGA Standard Repairs
   { keywords: ['solid member','boom repair','boom','spar boom','rib boom','box member','spar repair','spar web','insertion repair','box spar','laminated member','spruce boom','scarf 15','15:1','solid spruce'], path: 'BGA_Standard_Repairs/section3_ch34_solid_member_repairs.txt', label: 'BGA Standard Repairs — Section 3 Chapter 3.4 (Solid Member Repairs)' },
   { keywords: ['box member','box spar','spar cap','spar boom','box section','spar construction'], path: 'BGA_Standard_Repairs/section3_ch35_box_member_repairs.txt', label: 'BGA Standard Repairs — Section 3 Chapter 3.5 (Box Member Repairs)' },
@@ -290,15 +307,6 @@ const FILE_INDEX = [
   { keywords: ['certifying','bga glider','certify','non part 21','new glider'], path: 'general_airworthiness/AMP/amp_2-5_certifying_a_bga_glider.txt', label: 'AMP 2-5 — Certifying a BGA Glider' },
 
   { keywords: ['control cable','flying control','cable tension','turnbuckle','wire lock','locking wire','nicopress','cable inspection','swaged','fraying','cable wear','cable fatigue','cable repair'], path: 'glider-workshop/reference/AMP/ingest/records/1430312110-4-7.json', label: 'AMP 4-7 — Flying Control Cables (BGA)' },
-  { keywords: ['arc renewal','airworthiness review','part 21','arc','airworthiness review certificate'], path: 'glider-workshop/reference/AMP/ingest/records/amp-bga-c-of-a-renewal-v2-5-jan-24.json', label: 'AMP 2-2 — BGA C of A Renewal' },
-  { keywords: ['narc','national airworthiness review','narc renewal'], path: 'glider-workshop/reference/AMP/ingest/records/amp-narc-renewal-v2-5-jan-24.json', label: 'AMP 2-4 — NARC Renewal' },
-  { keywords: ['seat harness','harness','belt','seat belt','restraint','lap strap'], path: 'glider-workshop/reference/AMP/ingest/records/amp-seat-harnesses-and-belts-v2-5-jan-24.json', label: 'AMP 1-5 — Seat Harnesses and Belts' },
-  { keywords: ['acceptable material','approved material','release note','material specification','parts','approved parts'], path: 'glider-workshop/reference/AMP/ingest/records/amp-1-15-acceptable-materials-and-parts.json', label: 'AMP 1-15 — Acceptable Materials and Parts' },
-  { keywords: ['inspector authorisation','inspector rating','inspector approval','bga inspector','i/c','inspector qualification'], path: 'glider-workshop/reference/AMP/ingest/records/amp-inspector-authorisation-and-rating-dec-23.json', label: 'AMP 1-2 — Inspector Authorisation and Ratings' },
-  { keywords: ['modification','non part 21','glider modification','mod','approved modification'], path: 'glider-workshop/reference/AMP/ingest/records/amp-modification-to-non-part-21-gliders-v2-5-jan-24.json', label: 'AMP 2-3 — Modification of Non-Part 21 Gliders' },
-  { keywords: ['a conditions','a condition flight','permit','non part 21 flight','experimental'], path: 'glider-workshop/reference/AMP/ingest/records/amp-a-conditions-flight-v2-5-jan-24.json', label: 'AMP 2-1 — A Conditions Flight' },
-  { keywords: ['complex maintenance','complex task','critical maintenance','complex repair'], path: 'glider-workshop/reference/AMP/ingest/records/amp-complex-maintenance-5-jan-2024.json', label: 'AMP 1-12 — Complex Maintenance' },
-  { keywords: ['registration','sailplane registration','aircraft registration','register glider'], path: 'glider-workshop/reference/AMP/ingest/records/amp-registration-procedure-for-sailplanes-v2-5-jan-24.json', label: 'AMP 1-13 — Registration Procedure for Sailplanes' },
   { keywords: ['cs-stan','standard change','standard repair','cs stan'], path: 'glider-workshop/reference/AMP/ingest/records/inital-airworthiness-adopted-cs-stan-issue-4.json', label: 'CS-STAN Issue 4 — Standard Changes and Repairs' },
   { keywords: ['certifying','certify bga','bga certification','non part 21 certify'], path: 'glider-workshop/reference/AMP/ingest/records/amp-2-5-bga-certification-process-non-part-21-gliders.json', label: 'AMP 2-5 — BGA Certification Process (Non-Part 21)' },
   { keywords: ['motor glider','engine','rotax','power plant','motorglider','engine inspection'], path: 'general_airworthiness/AMP/motor_glider_engine_inspection.txt', label: 'AMP — Motor Glider Engine Inspection and Repair' },
@@ -363,7 +371,25 @@ function selectDocuments(query) {
     // generic 1970s entries beating boosted modern notes via the list-length
     // rule), then shorter keyword list as the specificity proxy.
     .sort((a, b) => (b.score - a.score) || ((b.boost || 0) - (a.boost || 0)) || (a.keywords.length - b.keywords.length));
-  return scored.slice(0, 2);
+
+  // DEDUPE BY LABEL (8/8/26). Only TWO documents are returned, so two entries
+  // sharing a label spend both slots on the same document and crowd out the
+  // second-best distinct source completely. That is exactly what nine
+  // duplicated AMP entries were doing until they were pruned — on every AMP
+  // query, verified. The pruning fixed the instance; this fixes the class, so a
+  // future duplicate degrades to "one entry ignored" instead of silently
+  // halving what Alf gets to read. Highest-scoring entry for a label wins,
+  // since the list is already sorted.
+  const seenLabels = new Set();
+  const deduped = scored.filter(e => {
+    if (seenLabels.has(e.label)) {
+      console.log(`[archivist] Duplicate FILE_INDEX label suppressed: "${e.label}" (${e.path})`);
+      return false;
+    }
+    seenLabels.add(e.label);
+    return true;
+  });
+  return deduped.slice(0, 2);
 }
 
 // ── TNS finder (index lives in the PRIVATE repo; Alf surfaces links + matched lines only) ──
@@ -417,6 +443,73 @@ const TNS_STOPWORDS = new Set(['what','when','where','which','with','this','that
 const WK_REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
 const WK_INDEX_PATH = 'gliding_history_and_literature/wally_kahn_collection/search_index/index.json';
 const WK_COLLECTION_DIR = 'gliding_history_and_literature/wally_kahn_collection';
+// ── wk- book titles ───────────────────────────────────────────────────────────
+// Until 8/8/26 the sources panel derived a book's name from its slug, which
+// produced bare lowercase strings — "dying high", "slingsby sailplanes" — in a
+// panel whose whole job is to tell the reader which book a claim came from.
+// The manifest carries the real published filename for all 155 books, so the
+// title comes from there rather than being reconstructed from a slug that was
+// only ever meant to be a filename-safe identifier.
+//
+// Titles are metadata, not book text: the restricted-use permission covers the
+// prose, and the collection's own landing page lists these titles publicly.
+// The manifest is still bundled at build time rather than committed, so this
+// repo stays free of collection data either way.
+const WK_MANIFEST_PATH = 'gliding_history_and_literature/wally_kahn_collection/manifest.json';
+let wkTitleMap = null;
+
+// Small words stay lowercase mid-title. "Up" is deliberately NOT in this set:
+// "Take Up Slack" is a launch command, not a phrasal verb to be tidied away.
+const TITLE_SMALL_WORDS = new Set(['a','an','and','as','at','but','by','for','in','nor',
+  'of','on','or','so','the','to','yet','with','from','into','over']);
+const TITLE_ACRONYMS = { bga: 'BGA', raf: 'RAF', usa: 'USA', uk: 'UK' };
+
+function wkTitleCase(text) {
+  const words = text.split(' ');
+  return words.map((w, i) => {
+    const lower = w.toLowerCase();
+    if (TITLE_ACRONYMS[lower]) return TITLE_ACRONYMS[lower];
+    if (i > 0 && i < words.length - 1 && TITLE_SMALL_WORDS.has(lower)) return lower;
+    return lower.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('-');
+  }).join(' ');
+}
+
+function wkCleanTitle(originalFilename) {
+  let t = originalFilename.replace(/\.pdf$/i, '').trim();
+  t = t.replace(/^['"]+|['"]+$/g, '').trim();   // some filenames are quoted: 'TAKE UP SLACK'
+  t = t.replace(/\s+/g, ' ');                   // several have doubled spaces
+  // Only re-case titles that arrive SHOUTING. The other 128 are already cased
+  // as published and must be left exactly alone — re-casing them would quietly
+  // "correct" the publisher (e.g. "Gliders and Sailplanes of the world").
+  if (t === t.toUpperCase() && /[A-Z]/.test(t)) t = wkTitleCase(t);
+  return t;
+}
+
+async function loadWkTitles() {
+  if (wkTitleMap) return wkTitleMap;
+  try {
+    const bundled = readBundled('wk_manifest.json');
+    const body = bundled || (await githubApiRaw(WK_REPO, WK_MANIFEST_PATH)).body;
+    const manifest = JSON.parse(body);
+    wkTitleMap = new Map(manifest
+      .filter(b => b.slug && b.original_filename)
+      .map(b => [b.slug, wkCleanTitle(b.original_filename)]));
+    console.log(`[archivist] wk- titles loaded: ${wkTitleMap.size}`);
+  } catch (e) {
+    // Non-fatal by design: a missing manifest costs nicer labels, not answers.
+    console.log(`[archivist] wk- manifest unavailable (${e.message}) — falling back to slug-derived titles`);
+    wkTitleMap = new Map();
+  }
+  return wkTitleMap;
+}
+
+// Falls back to the old slug prettifier so a label always renders.
+function wkTitle(slug) {
+  const known = wkTitleMap && wkTitleMap.get(slug);
+  if (known) return known;
+  return slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ');
+}
+
 const WK_LANDING_PAGE = 'https://www.lakesgc.co.uk/mainwebpages/Wally%20Kahn%20Book%20Collection.htm';
 
 let wkIndexCache = null; // survives warm invocations
@@ -1334,7 +1427,13 @@ export default async function handler(req, context) {
             new Promise(resolve => setTimeout(resolve, 12000))
           ])).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`)),
           timer.time('wk', () => Promise.race([
-            searchWkCollection(routingQuery).then(r => { wkResults = r; }),
+            // Titles load alongside the search so they sit inside the existing
+            // time box rather than adding a step after retrieval. loadWkTitles
+            // never rejects — worst case the labels fall back to slugs.
+            Promise.all([
+              searchWkCollection(routingQuery).then(r => { wkResults = r; }),
+              loadWkTitles()
+            ]),
             new Promise(resolve => setTimeout(resolve, 12000))
           ])).catch(e => console.log(`[archivist] wk- collection search skipped: ${e.message}`))
         ]);
@@ -1387,7 +1486,7 @@ export default async function handler(req, context) {
 
         const wkNote = wkResults.length > 0
           ? `\n\nWally Kahn / BGA eBook Collection search results (vintage gliding books, used with BGA permission — a private grounding store, NOT for reproduction):\n` +
-            wkResults.map(r => `- "${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')}", scan page ${r.pdf_page}\n  text: ${r.window_text.slice(0, 500).replace(/\n+/g, ' ')}...`).join('\n') +
+            wkResults.map(r => `- "${wkTitle(r.slug)}", scan page ${r.pdf_page}\n  text: ${r.window_text.slice(0, 500).replace(/\n+/g, ' ')}...`).join('\n') +
             `\n\nSTRICT RULES for using this material:\n` +
             `1. Summarise and paraphrase in your own words. This is the primary way to use this material.\n` +
             `2. At most ONE direct quotation, maximum 25 words, in quotation marks, clearly attributed to the book by name.\n` +
@@ -1444,7 +1543,7 @@ export default async function handler(req, context) {
         scannedTnsResults.forEach(s => addSource(`${s.label} (${s.decade}, scanned)`, 'tns-scan',
           { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library — read the authoritative copy' }));
         wkResults.forEach(r => addSource(
-          `${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')} (Wally Kahn / BGA eBook Collection)`,
+          `${wkTitle(r.slug)} (Wally Kahn / BGA eBook Collection)`,
           'wk-collection',
           { url: WK_LANDING_PAGE, name: 'Wally Kahn / BGA eBook Collection' }));
 
@@ -1539,4 +1638,5 @@ export default async function handler(req, context) {
 // the real shipped functions rather than a copy that can drift out of step with
 // them -- the whole silent-failure class this system spent 6/8 fixing came from
 // code paths nothing was checking.
-export { makeGatedWriter, makeSseParser, wkApplyChecksumGate, wkFindNearbyPageCitation };
+export { makeGatedWriter, makeSseParser, wkApplyChecksumGate, wkFindNearbyPageCitation,
+         wkCleanTitle, wkTitleCase, selectDocuments, FILE_INDEX };

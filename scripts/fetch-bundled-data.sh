@@ -59,5 +59,16 @@ fetch_raw "Kai-C-Clarke/vintage-glider-knowledge-base" \
   "gliding_history_and_literature/wally_kahn_collection/search_index/index.json" \
   "$DATA_DIR/wk_index.json"
 
+# wk- MANIFEST (8/8/26): slug -> original published filename for all 155 books,
+# used to render real book titles in the sources panel instead of prettified
+# slugs ("dying high"). Metadata only -- no book prose -- and the collection's
+# own landing page lists these titles publicly, but it is bundled the same way
+# as everything else here rather than committed, so this public repo stays free
+# of collection data by construction. archivist.mjs falls back to slug-derived
+# titles if this file is absent, so a failed fetch costs labels, not answers.
+fetch_raw "Kai-C-Clarke/vintage-glider-knowledge-base" \
+  "gliding_history_and_literature/wally_kahn_collection/manifest.json" \
+  "$DATA_DIR/wk_manifest.json"
+
 echo "Bundled data fetch complete. $(ls "$DATA_DIR" 2>/dev/null | wc -l) files in $DATA_DIR."
 exit 0
