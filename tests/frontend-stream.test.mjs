@@ -148,3 +148,37 @@ test('the front end appends only — it never rewrites what the server sent', as
   ]));
   assert.equal(messages.querySelector('.message-body').textContent, 'One. Two. Three.');
 });
+
+// ── Links ────────────────────────────────────────────────────────────────────
+
+test('no anchor points at an in-page id: this layout cannot scroll', async () => {
+  // body is height:100dvh with overflow:hidden — a fixed app shell. An
+  // href="#some-id" has nowhere to jump to and produces no visible change when
+  // clicked. "About & sources" pointed at the footer, which is permanently on
+  // screen anyway, so the click did nothing at all; removed 8/8/26. If an About
+  // panel is wanted later it needs the slide-over mechanism the archive drawer
+  // already uses, not an anchor.
+  //
+  // Bare href="#" is deliberately NOT caught here: the Download and Copy
+  // actions are anchors styled as buttons, with click handlers that
+  // preventDefault. Slightly old-fashioned, but they work.
+  const { win } = await send(() => streamResponse([
+    ev([{ type: 'text', delta: 'x' }]), ev([{ type: 'done' }])
+  ]));
+  const targeted = [...win.document.querySelectorAll('a[href^="#"]')]
+    .filter(a => (a.getAttribute('href') || '').length > 1)
+    .map(a => `${a.getAttribute('href')} ("${a.textContent.trim()}")`);
+  assert.deepEqual(targeted, [], 'in-page anchors cannot work in a non-scrolling layout');
+});
+
+test('every external link has a real destination', async () => {
+  const { win } = await send(() => streamResponse([
+    ev([{ type: 'text', delta: 'x' }]), ev([{ type: 'done' }])
+  ]));
+  const external = [...win.document.querySelectorAll('a')]
+    .filter(a => !a.classList.contains('action-btn'));
+  for (const a of external) {
+    const href = (a.getAttribute('href') || '').trim();
+    assert.ok(href && href !== '#', `empty or placeholder href on "${a.textContent.trim()}"`);
+  }
+});

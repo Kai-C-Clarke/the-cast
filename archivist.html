@@ -251,7 +251,9 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
 /* ---------- Mobile ---------- */
 @media (max-width: 900px) {
   #workspace { grid-template-columns: 1fr; }
-  a.topbar-link { display: none; }
+  /* The "About & sources" anchor was removed 8/8/26 (dead link — see the
+     footer id note below), so this rule no longer has anything to hide.
+     "View the Archive" is a button, not an anchor, and stays visible here. */
   #hero .avatar-ring { width: 60px; height: 60px; }
   #hero { padding: 14px 16px 12px; }
   #chat-col { border-right: none; }
@@ -273,7 +275,6 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
     <div class="role">Honorary Archivist</div>
   </div>
   <span class="spacer"></span>
-  <a class="topbar-link" href="#about">About &amp; sources</a>
   <button class="topbar-link" id="archive-toggle" aria-label="Open the archive browser">View the Archive</button>
   <button id="new-chat-btn">New chat</button>
 </header>
@@ -321,6 +322,13 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
 </div>
 <div id="drawer-scrim"></div>
 
+<!-- id kept for the anchor in the acknowledgement copy and for anyone linking
+     in from outside. NOT a jump target from within the page: body is
+     height:100dvh with overflow:hidden, so nothing scrolls and this footer
+     is always already on screen. A "#about" link here can never do
+     anything, which is why the top-bar one was removed on 8/8/26 rather
+     than repaired. If an About panel is wanted later, use the slide-over
+     mechanism the archive drawer already has. -->
 <footer id="about">
   Draws on the <strong>Wally Kahn / BGA eBook Collection</strong>, with thanks to Wally Kahn and the
   <a href="https://gliding.co.uk" target="_blank" rel="noopener">BGA</a> Technical Committee, past and present
