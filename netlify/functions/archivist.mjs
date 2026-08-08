@@ -1,6 +1,7 @@
-const https = require('https');
-const fs = require('fs');
-const path = require('path');
+import https from 'node:https';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -32,6 +33,9 @@ const GITHUB_REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
 // of the most recent Netlify build/deploy, not the live state. A source-repo
 // change only takes effect on Alf after the next deploy (any push to
 // the-cast, or a manual "Trigger deploy" in Netlify if only the data changed).
+// ESM (8/8/26): this file is .mjs so Netlify treats it as a v2 streaming
+// function; __dirname does not exist in ESM.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
 function readBundled(filename) {
   try {
@@ -602,7 +606,13 @@ function wkStripSentenceContaining(text, matchStart, matchEnd) {
   return { start, end };
 }
 
-function wkApplyChecksumGate(reply, wkResults) {
+// allowFallback (8/8/26, streaming refactor): under streaming this gate runs
+// per-paragraph rather than once over the whole reply, so the "nothing
+// substantive left" fallback must NOT fire per paragraph -- it would inject the
+// apology after every short paragraph. Chunk callers pass allowFallback:false
+// and the caller applies the fallback once, at the end, across everything
+// actually emitted. Non-streaming behaviour is unchanged (defaults to true).
+function wkApplyChecksumGate(reply, wkResults, allowFallback = true) {
   if (!wkResults || wkResults.length === 0) return { reply, flagged: [] };
   const quoteRe = /["\u201c]([^"\u201d]{15,300})["\u201d]/g;
   const flagged = [];
@@ -636,7 +646,7 @@ function wkApplyChecksumGate(reply, wkResults) {
     result = result.slice(0, start) + result.slice(end);
   }
   result = result.replace(/\s{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
-  if (result.length < 20) {
+  if (allowFallback && result.length < 20) {
     // Stripping the flagged sentence(s) left nothing substantive -- an empty
     // reply is a worse failure than an honest explanation.
     result = "I found something that looked relevant in the Wally Kahn / BGA eBook Collection, but I couldn't verify the specific claim against the source text, so I don't want to state it with confidence. You may want to check the collection directly for this one — see the sources panel.";
@@ -958,11 +968,69 @@ async function logConversation(question, reply, fetchedLabels, failedLabels, wkG
   }
 }
 
-// ── Anthropic API call ────────────────────────────────────────────────────────
+// ── Anthropic API call (streaming) ────────────────────────────────────────────
+// Replaced the buffered anthropicPost() on 8/8/26. The old shape had to hold the
+// entire answer before returning anything, which meant long procedural answers
+// (35-44s observed) blew the ~26s Netlify gateway and survived only on a
+// front-end retry. Retrieval was never the cause -- the five tiers are
+// parallelised and capped at ~12s -- so the overrun was generation, and
+// streaming is the structural fix rather than more retrieval trimming.
+//
+// onText(delta) is called for every text fragment as it arrives. Resolves with
+// the assembled full text plus usage, so the post-stream steps (conversation
+// log, confabulation detection, token accounting) work exactly as before.
+// SSE frame parser, kept separate from the HTTP plumbing so it can be tested
+// directly against adversarial chunk boundaries -- network chunks split
+// mid-frame, mid-line and mid-JSON as a matter of routine, and a parser that
+// only works on tidy input is a silent-failure waiting to happen. (That whole
+// bug class is why this system now has a corpus verifier and a golden set.)
+function makeSseParser(onText) {
+  let buffer = '';
+  let text = '';
+  let usage = {};
+  let error = null;
 
-function anthropicPost(payload) {
+  function handleFrame(frame) {
+    for (const line of frame.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      const raw = line.slice(5).trim();
+      if (!raw || raw === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(raw); } catch (e) { continue; }
+      if (evt.type === 'content_block_delta' && evt.delta && evt.delta.type === 'text_delta') {
+        text += evt.delta.text;
+        try { onText(evt.delta.text); }
+        catch (e) { console.log(`[archivist] onText handler threw: ${e.message}`); }
+      } else if (evt.type === 'message_start' && evt.message && evt.message.usage) {
+        usage = { ...usage, ...evt.message.usage };
+      } else if (evt.type === 'message_delta' && evt.usage) {
+        usage = { ...usage, ...evt.usage };
+      } else if (evt.type === 'error') {
+        error = new Error('Anthropic stream error: ' + JSON.stringify(evt.error || evt));
+      }
+    }
+  }
+
+  return {
+    feed(chunk) {
+      buffer += chunk;
+      // Frames are separated by a blank line; hold the trailing partial frame.
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        handleFrame(buffer.slice(0, idx));
+        buffer = buffer.slice(idx + 2);
+      }
+    },
+    result() {
+      if (buffer.trim()) handleFrame(buffer); // tolerate a stream ending without a final blank line
+      return { text, usage, error };
+    }
+  };
+}
+
+function anthropicStream(payload, onText) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify(payload);
+    const body = JSON.stringify({ ...payload, stream: true });
     const options = {
       hostname: 'api.anthropic.com',
       path: '/v1/messages',
@@ -975,12 +1043,20 @@ function anthropicPost(payload) {
       }
     };
     const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
+      if (res.statusCode !== 200) {
+        let errBody = '';
+        res.on('data', c => errBody += c);
+        res.on('end', () => reject(new Error(`Anthropic HTTP ${res.statusCode}: ${errBody.slice(0, 500)}`)));
+        return;
+      }
+      const parser = makeSseParser(onText);
+      res.setEncoding('utf8');
+      res.on('data', chunk => parser.feed(chunk));
       res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error('Anthropic parse error: ' + data)); }
+        const r = parser.result();
+        return r.error ? reject(r.error) : resolve({ text: r.text, usage: r.usage });
       });
+      res.on('error', reject);
     });
     req.on('error', reject);
     req.write(body);
@@ -988,383 +1064,467 @@ function anthropicPost(payload) {
   });
 }
 
-// ── Handler ───────────────────────────────────────────────────────────────────
+// ── wk- checksum gate under streaming ─────────────────────────────────────────
+// THE CONSTRAINT THAT SHAPES THIS WHOLE REFACTOR (8/8/26):
+// wkApplyChecksumGate does not merely flag -- it EXCISES whole sentences whose
+// quotes are over-length (>25 words) or whose "scan page N" citation cannot be
+// verified against the source text. That is the structural enforcement of the
+// restricted-use permission Pete Stratten granted for the Wally Kahn / BGA
+// eBook Collection. Streaming raw tokens would put those sentences in front of
+// the reader before the gate could ever run, which would break a commitment to
+// the BGA -- not merely regress latency.
+//
+// So: two modes.
+//   * No wk- results this turn (the majority of queries -- the gate is already
+//     a documented no-op in that case): stream freely, fragment by fragment.
+//   * wk- results present: buffer and release at PARAGRAPH boundaries, gating
+//     each completed paragraph before it is emitted.
+//
+// Paragraph, not sentence, deliberately: wkFindNearbyPageCitation searches a
+// +/-120 char window around the quote, which routinely crosses a sentence
+// boundary ("...as the book has it, 'xxx'. See scan page 214."). Releasing per
+// sentence could emit a quote before its citation had arrived and strip a
+// perfectly good one. Paragraph boundaries contain the window, and
+// wkStripSentenceContaining already expands to sentence bounds, so the gate
+// keeps exactly its current semantics.
+// TRADE-OFF ACCEPTED: answers drawing on the books arrive in paragraph chunks
+// rather than smoothly. They still start within seconds instead of at 40s.
+function makeGatedWriter(wkResults, emit) {
+  const gated = wkResults && wkResults.length > 0;
+  let pending = '';
+  let emittedText = '';
+  const flagged = [];
 
-exports.handler = async function(event, context) {
-  const __handlerStart = Date.now();
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers: CORS_HEADERS, body: '' };
+  function release(chunk) {
+    if (!chunk) return;
+    const res = wkApplyChecksumGate(chunk, wkResults, false);
+    if (res.flagged.length > 0) flagged.push(...res.flagged);
+    if (res.reply) {
+      emittedText += res.reply;
+      emit(res.reply);
+    }
   }
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: CORS_HEADERS, body: 'Method Not Allowed' };
-  }
 
-  const clientIp = event.headers['x-nf-client-connection-ip'] || event.headers['client-ip'] || 'unknown';
-  if (!checkRateLimit(clientIp)) {
-    console.log(`[archivist] Rate limit hit: ${clientIp}`);
-    return {
-      statusCode: 429,
-      headers: CORS_HEADERS,
-      body: JSON.stringify({ error: "You've sent quite a few questions in a short time — give it a few minutes and try again. If you're doing something that genuinely needs more, get in touch." })
-    };
-  }
-
-  const timer = makeTimer();
-  try {
-    const { messages } = JSON.parse(event.body);
-    const userTurns = (messages || []).filter(m => m.role === 'user');
-    const latestQuery = userTurns.slice(-1)[0]?.content || '';
-    // Route on the last two user turns so short follow-ups ("and for solid spruce?") keep their subject
-    const routingQuery = userTurns.slice(-2).map(m => m.content).join(' ');
-    const relevantDocs = selectDocuments(routingQuery);
-
-    console.log(`[archivist] Query: "${latestQuery.slice(0,80)}" | Docs: ${relevantDocs.map(d=>d.label).join(', ') || 'none'}`);
-
-    const docContent = [];
-    const fetchedLabels = [];
-    const failedLabels = [];
-    const MAX_CHARS = 35000; // Keep well within Netlify 26s timeout
-
-    // Fetch documents in parallel rather than sequentially; TNS search runs alongside,
-    // time-boxed — a slow or failed TNS lookup must never delay or break the answer.
-    let tnsResults = [];
-    let referenceResults = [];
-    let scannedTnsResults = [];
-    let wkResults = [];
-    const retrievalT0 = Date.now();
-    const docsT0 = Date.now();
-    const fetchDocFailures = []; // diagnostic detail for the retry above, surfaced via ?debug=1
-    await Promise.all([
-      ...relevantDocs.map(async (doc) => {
-      try {
-        const cached = docFetchCache.get(doc.path);
-        if (cached) {
-          docContent.push({
-            type: 'text',
-            text: `[Archive document: ${doc.label}]\n\n${cached}`,
-            cache_control: { type: 'ephemeral' }
-          });
-          fetchedLabels.push(doc.label);
-          timer.mark('docs', Date.now() - docsT0);
-          return;
-        }
-        let fetchedText;
-        if (doc.path.startsWith('glider-workshop/')) {
-          // Fetch from glider-workshop repo (ingest JSON records)
-          const repoPath = doc.path.replace('glider-workshop/', '');
-          const res = await githubApi('GET', LOG_REPO, repoPath);
-          if (!res || res.status !== 200 || !res.json.content) { failedLabels.push(doc.label); return; }
-          const record = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
-          // Extract full_text or concatenate page texts
-          fetchedText = record.full_text || 
-            (record.pages || []).map(p => p.text_content || p.text || '').filter(Boolean).join('\n\n');
-          // Prepend annotations if present
-          if (record.annotations && record.annotations.length > 0) {
-            const annBlock = '⚠ ANNOTATIONS (read first):\n' + record.annotations.map(a => `• ${a}`).join('\n') + '\n\n';
-            fetchedText = annBlock + fetchedText;
-          }
-          // Add currency note
-          const ingestDate = record.ingest && record.ingest.date ? record.ingest.date : 'unknown';
-          fetchedText += `\n\n[Downloaded: ${ingestDate}. AMPs are under strict BGA revision control — always verify the current version at members.gliding.co.uk/airworthiness-2/airworthiness-and-maintenance-procedures/]`;
-        } else {
-          // Fetch from vintage-glider-knowledge-base (standard archive).
-          // One retry with backoff (5/8/26): golden-set testing found this
-          // branch failing intermittently on production (not reproducible
-          // locally against the same repo/token), consistent with a
-          // transient GitHub API hiccup rather than a path/code bug -- see
-          // fetchDocFailures for the real diagnostic captured on failure.
-          let meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
-          if (!meta.download_url) {
-            fetchDocFailures.push({ path: doc.path, attempt: 1, meta: JSON.stringify(meta).slice(0, 200) });
-            await new Promise(r => setTimeout(r, 700));
-            meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
-          }
-          if (!meta.download_url) {
-            fetchDocFailures.push({ path: doc.path, attempt: 2, meta: JSON.stringify(meta).slice(0, 200) });
-            failedLabels.push(doc.label);
-            return;
-          }
-          const rawBuffer = await fetchRawUrl(meta.download_url);
-          fetchedText = rawBuffer.toString('utf8');
-        }
-        // Corpus guard (6/8/26): never feed scrape garbage / empty / 404 bodies
-        // to the model as if they were the document. Treat as a failed fetch so
-        // the manifest + prompt handle it honestly.
-        if (isScrapeGarbage(fetchedText)) {
-          fetchDocFailures.push({ path: doc.path, attempt: 'content-guard', meta: `scrape-garbage or empty content (${fetchedText.length} chars)` });
-          failedLabels.push(doc.label);
-          console.log(`[archivist][corpus-guard] Rejected ${doc.path}: content matches scrape fingerprint or is empty (${fetchedText.length} chars)`);
-          return;
-        }
-        let docText = fetchedText.slice(0, MAX_CHARS);
-        if (fetchedText.length > MAX_CHARS) {
-          docText += `\n\n[DOCUMENT TRUNCATED at ${MAX_CHARS} characters — ${fetchedText.length - MAX_CHARS} characters beyond this point were not loaded. If the answer may lie in the unloaded portion, say so plainly rather than answering as if the document were complete.]`;
-          console.log(`[archivist] TRUNCATED ${doc.label}: ${fetchedText.length} chars -> ${MAX_CHARS}`);
-        }
-        // Cache full-document fetches (not just search indexes) on the warm
-        // instance -- these were the other network-bound, uncached GitHub call
-        // in the hot path, and repeated queries very often hit the same 1-2
-        // FILE_INDEX documents (5/8/26, after the concurrency retest showed
-        // 0/20 timeouts but tail latency still climbing under load).
-        cacheDoc(doc.path, docText);
-        docContent.push({
-          type: 'text',
-          text: `[Archive document: ${doc.label}]\n\n${docText}`,
-          cache_control: { type: 'ephemeral' }
-        });
-        fetchedLabels.push(doc.label);
-      } catch (e) {
-        failedLabels.push(doc.label);
-        console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
+  return {
+    gated,
+    push(delta) {
+      if (!gated) {
+        emittedText += delta;
+        emit(delta);
+        return;
       }
-      timer.mark('docs', Date.now() - docsT0);
-    }),
-      timer.time('tns', () => Promise.race([
-        searchTNS(routingQuery).then(r => { tnsResults = r; }),
-        new Promise(resolve => setTimeout(resolve, 6000))
-      ])).catch(e => console.log(`[archivist] TNS search skipped: ${e.message}`)),
-      timer.time('reference', () => Promise.race([
-        searchReference(routingQuery).then(r => { referenceResults = r; }),
-        new Promise(resolve => setTimeout(resolve, 8000))
-      ])).catch(e => console.log(`[archivist] Reference search skipped: ${e.message}`)),
-      timer.time('scannedTns', () => Promise.race([
-        searchScannedTNS(routingQuery).then(r => { scannedTnsResults = r; }),
-        new Promise(resolve => setTimeout(resolve, 12000))
-      ])).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`)),
-      timer.time('wk', () => Promise.race([
-        searchWkCollection(routingQuery).then(r => { wkResults = r; }),
-        new Promise(resolve => setTimeout(resolve, 12000))
-      ])).catch(e => console.log(`[archivist] wk- collection search skipped: ${e.message}`))
-    ]);
-    timer.mark('retrievalTotal', Date.now() - retrievalT0);
-
-    if (tnsResults.length > 0) {
-      console.log(`[archivist] TNS hits: ${tnsResults.map(t => t.label).join(', ')}`);
-    }
-    if (referenceResults.length > 0) {
-      console.log(`[archivist] Reference hits: ${referenceResults.map(r => r.label).join(', ')}`);
-    }
-
-    if (scannedTnsResults.length > 0) {
-      console.log(`[archivist] Scanned TNS hits: ${scannedTnsResults.map(r => r.label).join(', ')}`);
-    }
-    if (wkResults.length > 0) {
-      console.log(`[archivist] wk- hits: ${wkResults.map(r => `${r.slug}#${r.pdf_page}`).join(', ')}`);
-    }
-
-    const userContent = [];
-    const tnsNote = tnsResults.length > 0
-      ? `\n\nTNS search results (index of BGA Technical News Sheets — full text NOT in the Archive):\n` +
-        tnsResults.map(t => `- ${t.label} — ${t.url}\n  matched: ${t.snips.map(s => `"${s}"`).join(' | ')}`).join('\n') +
-        `\nIf any of these are relevant, tell the user the topic is covered in that TNS and give the link.`
-      : '';
-
-    const referenceNote = referenceResults.length > 0
-      ? `\n\nReference document search results (extracted text from BGA Standard Repairs, Compendium, Inspector Course, AC43.13-1B, Datasheets, OM100 records):\n` +
-        referenceResults.map(r => {
-          let entry = `- ${r.label} (Tier ${r.tier || 1})`;
-          if (r.annotations && r.annotations.length > 0) {
-            entry += `\n  ⚠ ANNOTATIONS (read first):\n` + r.annotations.map(a => `    • ${a}`).join('\n');
-          }
-          if (r.subject_tags && r.subject_tags.length > 0) {
-            entry += `\n  Subject tags: ${r.subject_tags.join(', ')}`;
-          }
-          entry += `\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`;
-          return entry;
-        }).join('\n') +
-        `\nUse these passages to answer the question. READ ANNOTATIONS FIRST — they contain warnings about superseded guidance and document currency. Cite the document name and page in your answer.`
-      : '';
-
-    const scannedTnsNote = scannedTnsResults.length > 0
-      ? `\n\nScanned TNS search results (pre-2020 BGA Technical News Sheets, tesseract OCR — treat text as approximate):\n` +
-        scannedTnsResults.map(r =>
-          `- ${r.label} (${r.decade})\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`
-        ).join('\n') +
-        `\nNote: these are older scanned documents — OCR may have minor errors. Use for guidance and topic identification, not verbatim quotes.`
-      : '';
-
-    const wkNote = wkResults.length > 0
-      ? `\n\nWally Kahn / BGA eBook Collection search results (vintage gliding books, used with BGA permission — a private grounding store, NOT for reproduction):\n` +
-        wkResults.map(r => `- "${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')}", scan page ${r.pdf_page}\n  text: ${r.window_text.slice(0, 500).replace(/\n+/g, ' ')}...`).join('\n') +
-        `\n\nSTRICT RULES for using this material:\n` +
-        `1. Summarise and paraphrase in your own words. This is the primary way to use this material.\n` +
-        `2. At most ONE direct quotation, maximum 25 words, in quotation marks, clearly attributed to the book by name.\n` +
-        `3. Cite the location using EXACTLY the phrase "scan page ${'{N}'}" with the pdf_page number given above. Never write a bare "page ${'{N}'}", "page ${'{N}'} of <book>", or any other page phrasing — the word "scan" must always be present, because this collection's printed page numbers are not verified and a bare page number would send the reader to the wrong page of the physical book.\n` +
-        `4. Do not reproduce more of the text than needed to answer the question.\n` +
-        `5. Tell the reader this comes from the Wally Kahn / BGA eBook Collection and that they can find the original at the source link provided in this system's sources panel — do not construct or guess a link yourself.`
-      : '';
-
-    // RETRIEVAL MANIFEST (6/8/26, Fable structural fix): always present, always
-    // explicit — the failure line says "NONE" rather than being omitted when
-    // empty. Negative prompt instructions could not override what an ambiguous
-    // context appeared to say; an unambiguous, always-present statement of
-    // retrieval status removes the ambiguity itself.
-    const retrievalManifest =
-      `\n\nRETRIEVAL MANIFEST (authoritative — this overrides any impression from the documents themselves):\n` +
-      `- Successfully retrieved this turn: ${fetchedLabels.length > 0 ? fetchedLabels.join('; ') : 'NONE'}\n` +
-      `- Failed to retrieve this turn: ${failedLabels.length > 0 ? failedLabels.join('; ') : 'NONE'}\n` +
-      `Only documents on the "Failed" line may ever be described with fetch-failure language. If the manifest says NONE failed, then nothing failed — if a fact is missing from a retrieved document, say the document was retrieved but does not contain that fact.`;
-
-    if (docContent.length > 0) {
-      userContent.push(...docContent);
-      let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
-      if (failedLabels.length > 0) {
-        contextNote += `\n\nNote: The following documents were identified as relevant but could not be retrieved just now: ${failedLabels.join(', ')}. Do not claim to have consulted them. If they matter to the answer, say plainly that they could not be reached and suggest the user try again.`;
+      pending += delta;
+      let idx;
+      while ((idx = pending.indexOf('\n\n')) !== -1) {
+        const para = pending.slice(0, idx + 2);
+        pending = pending.slice(idx + 2);
+        release(para);
       }
-      contextNote += retrievalManifest;
-      contextNote += tnsNote;
-      contextNote += referenceNote;
-      contextNote += scannedTnsNote;
-      contextNote += wkNote;
-      contextNote += `\n\nUser's question: ${latestQuery}`;
-      userContent.push({ type: 'text', text: contextNote });
-    } else if (failedLabels.length > 0) {
-      userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. You may explain general context from your own knowledge, but you must NOT state any engineering specification, figure, limit, part number, or product recommendation (oil grades, torque values, dimensions, speeds, forces) from general knowledge — those must always come from a retrieved document. Name the document the user should consult, and suggest they try again shortly.${retrievalManifest}${tnsNote}${referenceNote}${scannedTnsNote}${wkNote} User's question: ${latestQuery}` });
-    } else {
-      userContent.push({ type: 'text', text: (tnsNote || referenceNote || scannedTnsNote || wkNote) ? `${tnsNote}${referenceNote}${scannedTnsNote}${wkNote}\n\nUser's question: ${latestQuery}` : latestQuery });
-    }
-
-    const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
-    const allMessages = [...priorMessages, { role: 'user', content: userContent }];
-
-    const response = await timer.time('anthropic', () => anthropicPost({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1400,
-      system: [{ type: 'text', text: ARCHIVIST_SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: allMessages
-    }));
-
-    if (!response.content || !response.content[0]) {
-      throw new Error('Anthropic error: ' + JSON.stringify(response));
-    }
-
-    let reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const wkGate = wkApplyChecksumGate(reply, wkResults);
-    reply = wkGate.reply;
-
-    // Detection (not correction) for a confabulation pattern found in golden-
-    // set testing 5/8/26: the model sometimes claims a document "failed to
-    // load," "wasn't retrieved," "404," etc. when it was in fact retrieved
-    // successfully and is sitting in its own context -- it just didn't find
-    // the specific fact inside it. Three escalating prompt rewrites in the
-    // system prompt (RETRIEVAL-FAILURE HONESTY) did not fully suppress this.
-    // Auto-rewriting the reply here would risk mangling otherwise-good text
-    // (unlike the wk- quote gate, there's no clean span to excise), so this
-    // only detects and logs -- visibility for now, not a fix. If every
-    // FILE_INDEX doc this turn was actually fetched successfully (no real
-    // failures) but the reply still uses fetch-failure language, that's a
-    // near-certain false claim.
-    const FETCH_FAILURE_PHRASES = /\b(failed to load|wasn'?t retrieved|not retrieved|was not retrieved|were not retrieved|404|came back empty|not delivered|wasn'?t delivered|returned an error|couldn'?t (be )?retriev)/i;
-    let suspectedFalseFetchClaim = failedLabels.length === 0 && relevantDocs.length > 0 && FETCH_FAILURE_PHRASES.test(reply);
-    let regeneratedOnDetect = false;
-    // Time budget (6/8/26 latency fix): the corrective regeneration doubles the
-    // model calls. Fine when the first pass was quick; fatal when we're already
-    // deep into the ~26s gateway window — three 504s observed today (wk17, Q4,
-    // "spruce repair"). Past 12s elapsed, ship the original with the flag up
-    // rather than 504 the whole request. Real fix (tier parallelisation) is the
-    // next engine session.
-    if (suspectedFalseFetchClaim && (Date.now() - __handlerStart) > 12000) {
-      console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration SKIPPED — ${Date.now() - __handlerStart}ms already elapsed, would risk gateway timeout`);
-    } else if (suspectedFalseFetchClaim) {
-      console.log(`[archivist][SUSPECTED-CONFABULATION] reply used fetch-failure language but all ${relevantDocs.length} FILE_INDEX doc(s) were actually fetched successfully (fetchedLabels: ${fetchedLabels.join(', ')})`);
-      // Backstop (6/8/26): with the fetchRawUrl root cause fixed and the
-      // always-present manifest in place, this should now fire rarely, if at
-      // all. When it does: one corrective regeneration, then give up and ship
-      // the original rather than loop.
-      try {
-        const retryResponse = await timer.time('anthropicRetry', () => anthropicPost({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
-          system: [{ type: 'text', text: ARCHIVIST_SYSTEM, cache_control: { type: 'ephemeral' } }],
-          messages: [...allMessages,
-            { role: 'assistant', content: reply },
-            { role: 'user', content: `Correction required: your reply described a document as failing to load / not retrieved / 404, but the RETRIEVAL MANIFEST for this turn shows NO retrieval failures — every listed document was retrieved successfully and its text was shown to you. Rewrite your answer without any fetch-failure language. If a fact was missing from a retrieved document, state plainly that the document was retrieved but does not contain that fact.` }]
-        }));
-        const retryReply = (retryResponse.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-        if (retryReply && !FETCH_FAILURE_PHRASES.test(retryReply)) {
-          reply = wkApplyChecksumGate(retryReply, wkResults).reply;
-          regeneratedOnDetect = true;
-          suspectedFalseFetchClaim = false;
-          console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration succeeded — clean rewrite shipped`);
-        } else {
-          console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration still contained fetch-failure language — shipping original, flag stays up`);
-        }
-      } catch (e) {
-        console.log(`[archivist][SUSPECTED-CONFABULATION] regeneration failed (${e.message}) — shipping original`);
+    },
+    // Returns the text actually put in front of the reader -- which, when the
+    // gate has stripped something, is NOT the model's raw output. The
+    // conversation log and the client's own history must both record what was
+    // shown, not what was generated.
+    finish() {
+      if (gated && pending) { release(pending); pending = ''; }
+      if (gated && flagged.length > 0 && emittedText.trim().length < 20) {
+        // Everything substantive was stripped. An empty reply is a worse
+        // failure than an honest explanation -- same fallback as the buffered
+        // gate, applied ONCE here rather than per paragraph.
+        const fallback = "I found something that looked relevant in the Wally Kahn / BGA eBook Collection, but I couldn't verify the specific claim against the source text, so I don't want to state it with confidence. You may want to check the collection directly for this one — see the sources panel.";
+        emittedText += fallback;
+        emit(fallback);
       }
+      return { text: emittedText, flagged };
     }
+  };
+}
 
-    console.log(`[archivist] Tokens: ${response.usage?.input_tokens}in / ${response.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
-
-    // Full provenance for the sources panel. Previously `sources` listed only
-    // full-document fetches — search-hit snippets that supplied figures were
-    // invisible (the corrected SHK-1 answer cited wb-shk-1 yet sources showed
-    // only the Compendium). Every consulted material now appears, with an
-    // authoritative link where a public source exists.
-    const sourceDetails = [];
-    const seen = new Set();
-    const addSource = (label, kind, link) => {
-      if (!label || seen.has(label)) return;
-      seen.add(label);
-      sourceDetails.push({ label, kind, url: link ? link.url : null, urlName: link ? link.name : null });
-    };
-    relevantDocs.forEach(doc => {
-      if (fetchedLabels.includes(doc.label)) addSource(doc.label, 'document', sourceLink(doc.label, doc.path));
-    });
-    referenceResults.forEach(r => addSource(r.label, 'search', sourceLink(r.label, r.source || '')));
-    tnsResults.forEach(t => addSource(t.label, 'tns', t.url
-      ? { url: t.url, name: 'BGA TNS library — authoritative current copy' }
-      : { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library' }));
-    scannedTnsResults.forEach(s => addSource(`${s.label} (${s.decade}, scanned)`, 'tns-scan',
-      { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library — read the authoritative copy' }));
-    wkResults.forEach(r => addSource(
-      `${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')} (Wally Kahn / BGA eBook Collection)`,
-      'wk-collection',
-      { url: WK_LANDING_PAGE, name: 'Wally Kahn / BGA eBook Collection' }));
-
-    const sourceLabels = sourceDetails.map(s => s.label);
-
-    // Log the exchange for weekly review (disclosed on page). Time-boxed and
-    // failure-tolerant: a slow or failed log write must never delay the answer.
-    try {
-      await timer.time('log', () => Promise.race([
-        logConversation(latestQuery, reply, sourceLabels, failedLabels, wkGate.flagged),
-        new Promise(resolve => setTimeout(resolve, 4000))
-      ]));
-    } catch (e) {
-      console.log(`[archivist] Log skipped: ${e.message}`);
-    }
-
-    const timing = timer.summary();
-    console.log(`[archivist][timing] docs=${timing.docs ?? '-'}ms tns=${timing.tns ?? '-'}ms reference=${timing.reference ?? '-'}ms scannedTns=${timing.scannedTns ?? '-'}ms wk=${timing.wk ?? '-'}ms retrievalTotal=${timing.retrievalTotal ?? '-'}ms anthropic=${timing.anthropic ?? '-'}ms log=${timing.log ?? '-'}ms total=${timing.total}ms`);
-    if (fetchDocFailures.length > 0) console.log(`[archivist][doc-fetch-failure] ${JSON.stringify(fetchDocFailures)}`);
-
-    const body = { reply, sources: sourceLabels, sourceDetails };
-    // Debug timing exposed via env var OR a per-request query param, so real
-    // load-test traffic can be profiled directly (no Netlify dashboard/token
-    // needed to see where the tail latency actually goes) -- Fable, 5/8/26.
-    if (process.env.DEBUG_TIMING === '1' || (event.queryStringParameters && event.queryStringParameters.debug === '1')) {
-      body._timing = timing;
-      body._timings = timing;
-      if (fetchDocFailures.length > 0) body._docFetchFailures = fetchDocFailures;
-      if (suspectedFalseFetchClaim) body._suspectedConfabulation = true;
-      if (regeneratedOnDetect) body._regeneratedOnDetect = true;
-    }
-
-    return {
-      statusCode: 200,
-      headers: CORS_HEADERS,
-      body: JSON.stringify(body)
-    };
-
-  } catch (err) {
-    const timing = timer.summary();
-    console.log(`[archivist] Error: ${err.message} | [archivist][timing] total=${timing.total}ms ${JSON.stringify(timing)}`);
-    return {
-      statusCode: 500,
-      headers: CORS_HEADERS,
-      body: JSON.stringify({ error: err.message })
-    };
-  }
+// ── Handler (Netlify Functions v2, streaming) ─────────────────────────────────
+// v1 -> v2 (8/8/26): v1's { statusCode, body } shape cannot stream. v2 takes a
+// standard Request and returns a standard Response, whose body may be a
+// ReadableStream. This file is .mjs so Netlify treats it as ESM/v2 without a
+// package.json, which would otherwise change how the four remaining v1
+// functions in this directory (chat, tomita, confucius, tts) are bundled. The
+// public endpoint path is unchanged: /.netlify/functions/archivist
+//
+// KEY STRUCTURAL POINT: the Response is returned IMMEDIATELY and retrieval runs
+// INSIDE the stream. Bytes therefore start flowing within milliseconds, so the
+// gateway idle window stops applying at all rather than merely being beaten by
+// a faster answer.
+const SSE_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Content-Type': 'text/event-stream; charset=utf-8',
+  'Cache-Control': 'no-cache, no-transform',
+  'Connection': 'keep-alive',
+  'X-Accel-Buffering': 'no'
 };
 
+export default async function handler(req, context) {
+  const __handlerStart = Date.now();
+
+  if (req.method === 'OPTIONS') {
+    return new Response('', { status: 200, headers: CORS_HEADERS });
+  }
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: CORS_HEADERS });
+  }
+
+  const clientIp = req.headers.get('x-nf-client-connection-ip') || req.headers.get('client-ip') || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    console.log(`[archivist] Rate limit hit: ${clientIp}`);
+    return new Response(JSON.stringify({ error: "You've sent quite a few questions in a short time — give it a few minutes and try again. If you're doing something that genuinely needs more, get in touch." }),
+      { status: 429, headers: CORS_HEADERS });
+  }
+
+  // Anything that can fail BEFORE the stream opens is still a normal JSON error
+  // response. Once headers are sent a 500 is no longer available -- see the
+  // in-stream error event below.
+  let body;
+  try {
+    body = await req.json();
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'Bad request body' }), { status: 400, headers: CORS_HEADERS });
+  }
+
+  const url = new URL(req.url);
+  const debug = process.env.DEBUG_TIMING === '1' || url.searchParams.get('debug') === '1';
+
+  const timer = makeTimer();
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let closed = false;
+      const send = (obj) => {
+        if (closed) return;
+        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)); }
+        catch (e) { closed = true; }
+      };
+
+      try {
+        const { messages } = body;
+        const userTurns = (messages || []).filter(m => m.role === 'user');
+        const latestQuery = userTurns.slice(-1)[0]?.content || '';
+        // Route on the last two user turns so short follow-ups ("and for solid spruce?") keep their subject
+        const routingQuery = userTurns.slice(-2).map(m => m.content).join(' ');
+        const relevantDocs = selectDocuments(routingQuery);
+
+        console.log(`[archivist] Query: "${latestQuery.slice(0,80)}" | Docs: ${relevantDocs.map(d=>d.label).join(', ') || 'none'}`);
+
+        // First byte out immediately: establishes the connection and tells the
+        // client retrieval is underway, before any of it has actually happened.
+        send({ type: 'status', stage: 'retrieving' });
+
+        const docContent = [];
+        const fetchedLabels = [];
+        const failedLabels = [];
+        const MAX_CHARS = 35000; // Context budget per document (was framed as a 26s-timeout guard; under streaming the gateway window no longer applies)
+
+        // Fetch documents in parallel rather than sequentially; TNS search runs alongside,
+        // time-boxed — a slow or failed TNS lookup must never delay or break the answer.
+        let tnsResults = [];
+        let referenceResults = [];
+        let scannedTnsResults = [];
+        let wkResults = [];
+        const retrievalT0 = Date.now();
+        const docsT0 = Date.now();
+        const fetchDocFailures = []; // diagnostic detail for the retry above, surfaced via ?debug=1
+        await Promise.all([
+          ...relevantDocs.map(async (doc) => {
+          try {
+            const cached = docFetchCache.get(doc.path);
+            if (cached) {
+              docContent.push({
+                type: 'text',
+                text: `[Archive document: ${doc.label}]\n\n${cached}`,
+                cache_control: { type: 'ephemeral' }
+              });
+              fetchedLabels.push(doc.label);
+              timer.mark('docs', Date.now() - docsT0);
+              return;
+            }
+            let fetchedText;
+            if (doc.path.startsWith('glider-workshop/')) {
+              // Fetch from glider-workshop repo (ingest JSON records)
+              const repoPath = doc.path.replace('glider-workshop/', '');
+              const res = await githubApi('GET', LOG_REPO, repoPath);
+              if (!res || res.status !== 200 || !res.json.content) { failedLabels.push(doc.label); return; }
+              const record = JSON.parse(Buffer.from(res.json.content, 'base64').toString('utf8'));
+              // Extract full_text or concatenate page texts
+              fetchedText = record.full_text || 
+                (record.pages || []).map(p => p.text_content || p.text || '').filter(Boolean).join('\n\n');
+              // Prepend annotations if present
+              if (record.annotations && record.annotations.length > 0) {
+                const annBlock = '⚠ ANNOTATIONS (read first):\n' + record.annotations.map(a => `• ${a}`).join('\n') + '\n\n';
+                fetchedText = annBlock + fetchedText;
+              }
+              // Add currency note
+              const ingestDate = record.ingest && record.ingest.date ? record.ingest.date : 'unknown';
+              fetchedText += `\n\n[Downloaded: ${ingestDate}. AMPs are under strict BGA revision control — always verify the current version at members.gliding.co.uk/airworthiness-2/airworthiness-and-maintenance-procedures/]`;
+            } else {
+              // Fetch from vintage-glider-knowledge-base (standard archive).
+              // One retry with backoff (5/8/26): golden-set testing found this
+              // branch failing intermittently on production (not reproducible
+              // locally against the same repo/token), consistent with a
+              // transient GitHub API hiccup rather than a path/code bug -- see
+              // fetchDocFailures for the real diagnostic captured on failure.
+              let meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
+              if (!meta.download_url) {
+                fetchDocFailures.push({ path: doc.path, attempt: 1, meta: JSON.stringify(meta).slice(0, 200) });
+                await new Promise(r => setTimeout(r, 700));
+                meta = await githubGet(encodeURIComponent(doc.path).replace(/%2F/g, '/'));
+              }
+              if (!meta.download_url) {
+                fetchDocFailures.push({ path: doc.path, attempt: 2, meta: JSON.stringify(meta).slice(0, 200) });
+                failedLabels.push(doc.label);
+                return;
+              }
+              const rawBuffer = await fetchRawUrl(meta.download_url);
+              fetchedText = rawBuffer.toString('utf8');
+            }
+            // Corpus guard (6/8/26): never feed scrape garbage / empty / 404 bodies
+            // to the model as if they were the document. Treat as a failed fetch so
+            // the manifest + prompt handle it honestly.
+            if (isScrapeGarbage(fetchedText)) {
+              fetchDocFailures.push({ path: doc.path, attempt: 'content-guard', meta: `scrape-garbage or empty content (${fetchedText.length} chars)` });
+              failedLabels.push(doc.label);
+              console.log(`[archivist][corpus-guard] Rejected ${doc.path}: content matches scrape fingerprint or is empty (${fetchedText.length} chars)`);
+              return;
+            }
+            let docText = fetchedText.slice(0, MAX_CHARS);
+            if (fetchedText.length > MAX_CHARS) {
+              docText += `\n\n[DOCUMENT TRUNCATED at ${MAX_CHARS} characters — ${fetchedText.length - MAX_CHARS} characters beyond this point were not loaded. If the answer may lie in the unloaded portion, say so plainly rather than answering as if the document were complete.]`;
+              console.log(`[archivist] TRUNCATED ${doc.label}: ${fetchedText.length} chars -> ${MAX_CHARS}`);
+            }
+            // Cache full-document fetches (not just search indexes) on the warm
+            // instance -- these were the other network-bound, uncached GitHub call
+            // in the hot path, and repeated queries very often hit the same 1-2
+            // FILE_INDEX documents (5/8/26, after the concurrency retest showed
+            // 0/20 timeouts but tail latency still climbing under load).
+            cacheDoc(doc.path, docText);
+            docContent.push({
+              type: 'text',
+              text: `[Archive document: ${doc.label}]\n\n${docText}`,
+              cache_control: { type: 'ephemeral' }
+            });
+            fetchedLabels.push(doc.label);
+          } catch (e) {
+            failedLabels.push(doc.label);
+            console.log(`[archivist] Failed to fetch ${doc.path}: ${e.message}`);
+          }
+          timer.mark('docs', Date.now() - docsT0);
+        }),
+          timer.time('tns', () => Promise.race([
+            searchTNS(routingQuery).then(r => { tnsResults = r; }),
+            new Promise(resolve => setTimeout(resolve, 6000))
+          ])).catch(e => console.log(`[archivist] TNS search skipped: ${e.message}`)),
+          timer.time('reference', () => Promise.race([
+            searchReference(routingQuery).then(r => { referenceResults = r; }),
+            new Promise(resolve => setTimeout(resolve, 8000))
+          ])).catch(e => console.log(`[archivist] Reference search skipped: ${e.message}`)),
+          timer.time('scannedTns', () => Promise.race([
+            searchScannedTNS(routingQuery).then(r => { scannedTnsResults = r; }),
+            new Promise(resolve => setTimeout(resolve, 12000))
+          ])).catch(e => console.log(`[archivist] Scanned TNS search skipped: ${e.message}`)),
+          timer.time('wk', () => Promise.race([
+            searchWkCollection(routingQuery).then(r => { wkResults = r; }),
+            new Promise(resolve => setTimeout(resolve, 12000))
+          ])).catch(e => console.log(`[archivist] wk- collection search skipped: ${e.message}`))
+        ]);
+        timer.mark('retrievalTotal', Date.now() - retrievalT0);
+
+        if (tnsResults.length > 0) {
+          console.log(`[archivist] TNS hits: ${tnsResults.map(t => t.label).join(', ')}`);
+        }
+        if (referenceResults.length > 0) {
+          console.log(`[archivist] Reference hits: ${referenceResults.map(r => r.label).join(', ')}`);
+        }
+
+        if (scannedTnsResults.length > 0) {
+          console.log(`[archivist] Scanned TNS hits: ${scannedTnsResults.map(r => r.label).join(', ')}`);
+        }
+        if (wkResults.length > 0) {
+          console.log(`[archivist] wk- hits: ${wkResults.map(r => `${r.slug}#${r.pdf_page}`).join(', ')}`);
+        }
+
+        const userContent = [];
+        const tnsNote = tnsResults.length > 0
+          ? `\n\nTNS search results (index of BGA Technical News Sheets — full text NOT in the Archive):\n` +
+            tnsResults.map(t => `- ${t.label} — ${t.url}\n  matched: ${t.snips.map(s => `"${s}"`).join(' | ')}`).join('\n') +
+            `\nIf any of these are relevant, tell the user the topic is covered in that TNS and give the link.`
+          : '';
+
+        const referenceNote = referenceResults.length > 0
+          ? `\n\nReference document search results (extracted text from BGA Standard Repairs, Compendium, Inspector Course, AC43.13-1B, Datasheets, OM100 records):\n` +
+            referenceResults.map(r => {
+              let entry = `- ${r.label} (Tier ${r.tier || 1})`;
+              if (r.annotations && r.annotations.length > 0) {
+                entry += `\n  ⚠ ANNOTATIONS (read first):\n` + r.annotations.map(a => `    • ${a}`).join('\n');
+              }
+              if (r.subject_tags && r.subject_tags.length > 0) {
+                entry += `\n  Subject tags: ${r.subject_tags.join(', ')}`;
+              }
+              entry += `\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`;
+              return entry;
+            }).join('\n') +
+            `\nUse these passages to answer the question. READ ANNOTATIONS FIRST — they contain warnings about superseded guidance and document currency. Cite the document name and page in your answer.`
+          : '';
+
+        const scannedTnsNote = scannedTnsResults.length > 0
+          ? `\n\nScanned TNS search results (pre-2020 BGA Technical News Sheets, tesseract OCR — treat text as approximate):\n` +
+            scannedTnsResults.map(r =>
+              `- ${r.label} (${r.decade})\n  matched: ${r.snips.map(s => `"${s}"`).join(' | ')}`
+            ).join('\n') +
+            `\nNote: these are older scanned documents — OCR may have minor errors. Use for guidance and topic identification, not verbatim quotes.`
+          : '';
+
+        const wkNote = wkResults.length > 0
+          ? `\n\nWally Kahn / BGA eBook Collection search results (vintage gliding books, used with BGA permission — a private grounding store, NOT for reproduction):\n` +
+            wkResults.map(r => `- "${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')}", scan page ${r.pdf_page}\n  text: ${r.window_text.slice(0, 500).replace(/\n+/g, ' ')}...`).join('\n') +
+            `\n\nSTRICT RULES for using this material:\n` +
+            `1. Summarise and paraphrase in your own words. This is the primary way to use this material.\n` +
+            `2. At most ONE direct quotation, maximum 25 words, in quotation marks, clearly attributed to the book by name.\n` +
+            `3. Cite the location using EXACTLY the phrase "scan page ${'{N}'}" with the pdf_page number given above. Never write a bare "page ${'{N}'}", "page ${'{N}'} of <book>", or any other page phrasing — the word "scan" must always be present, because this collection's printed page numbers are not verified and a bare page number would send the reader to the wrong page of the physical book.\n` +
+            `4. Do not reproduce more of the text than needed to answer the question.\n` +
+            `5. Tell the reader this comes from the Wally Kahn / BGA eBook Collection and that they can find the original at the source link provided in this system's sources panel — do not construct or guess a link yourself.`
+          : '';
+
+        // RETRIEVAL MANIFEST (6/8/26, Fable structural fix): always present, always
+        // explicit — the failure line says "NONE" rather than being omitted when
+        // empty. Negative prompt instructions could not override what an ambiguous
+        // context appeared to say; an unambiguous, always-present statement of
+        // retrieval status removes the ambiguity itself.
+        const retrievalManifest =
+          `\n\nRETRIEVAL MANIFEST (authoritative — this overrides any impression from the documents themselves):\n` +
+          `- Successfully retrieved this turn: ${fetchedLabels.length > 0 ? fetchedLabels.join('; ') : 'NONE'}\n` +
+          `- Failed to retrieve this turn: ${failedLabels.length > 0 ? failedLabels.join('; ') : 'NONE'}\n` +
+          `Only documents on the "Failed" line may ever be described with fetch-failure language. If the manifest says NONE failed, then nothing failed — if a fact is missing from a retrieved document, say the document was retrieved but does not contain that fact.`;
+
+        if (docContent.length > 0) {
+          userContent.push(...docContent);
+          let contextNote = `The above document(s) have been retrieved from the Archive as likely relevant.`;
+          if (failedLabels.length > 0) {
+            contextNote += `\n\nNote: The following documents were identified as relevant but could not be retrieved just now: ${failedLabels.join(', ')}. Do not claim to have consulted them. If they matter to the answer, say plainly that they could not be reached and suggest the user try again.`;
+          }
+          contextNote += retrievalManifest;
+          contextNote += tnsNote;
+          contextNote += referenceNote;
+          contextNote += scannedTnsNote;
+          contextNote += wkNote;
+          contextNote += `\n\nUser's question: ${latestQuery}`;
+          userContent.push({ type: 'text', text: contextNote });
+        } else if (failedLabels.length > 0) {
+          userContent.push({ type: 'text', text: `Documents were identified as relevant (${failedLabels.join(', ')}) but could not be retrieved just now. Do not claim to have consulted them. You may explain general context from your own knowledge, but you must NOT state any engineering specification, figure, limit, part number, or product recommendation (oil grades, torque values, dimensions, speeds, forces) from general knowledge — those must always come from a retrieved document. Name the document the user should consult, and suggest they try again shortly.${retrievalManifest}${tnsNote}${referenceNote}${scannedTnsNote}${wkNote} User's question: ${latestQuery}` });
+        } else {
+          userContent.push({ type: 'text', text: (tnsNote || referenceNote || scannedTnsNote || wkNote) ? `${tnsNote}${referenceNote}${scannedTnsNote}${wkNote}\n\nUser's question: ${latestQuery}` : latestQuery });
+        }
+
+
+        const sourceDetails = [];
+        const seen = new Set();
+        const addSource = (label, kind, link) => {
+          if (!label || seen.has(label)) return;
+          seen.add(label);
+          sourceDetails.push({ label, kind, url: link ? link.url : null, urlName: link ? link.name : null });
+        };
+        relevantDocs.forEach(doc => {
+          if (fetchedLabels.includes(doc.label)) addSource(doc.label, 'document', sourceLink(doc.label, doc.path));
+        });
+        referenceResults.forEach(r => addSource(r.label, 'search', sourceLink(r.label, r.source || '')));
+        tnsResults.forEach(t => addSource(t.label, 'tns', t.url
+          ? { url: t.url, name: 'BGA TNS library — authoritative current copy' }
+          : { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library' }));
+        scannedTnsResults.forEach(s => addSource(`${s.label} (${s.decade}, scanned)`, 'tns-scan',
+          { url: 'https://members.gliding.co.uk/library/tns/', name: 'BGA TNS library — read the authoritative copy' }));
+        wkResults.forEach(r => addSource(
+          `${r.slug.replace(/^wk-b\d+s?-/, '').replace(/-/g, ' ')} (Wally Kahn / BGA eBook Collection)`,
+          'wk-collection',
+          { url: WK_LANDING_PAGE, name: 'Wally Kahn / BGA eBook Collection' }));
+
+        const sourceLabels = sourceDetails.map(s => s.label);
+        send({ type: 'sources', sources: sourceLabels, sourceDetails });
+
+        const priorMessages = (messages || []).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+        const allMessages = [...priorMessages, { role: 'user', content: userContent }];
+
+        const writer = makeGatedWriter(wkResults, (chunk) => send({ type: 'text', delta: chunk }));
+        if (writer.gated) console.log(`[archivist][wk-checksum] paragraph-gated streaming active (${wkResults.length} wk- hit(s))`);
+
+        const anthropicT0 = Date.now();
+        const result = await anthropicStream({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1400,
+          system: [{ type: 'text', text: ARCHIVIST_SYSTEM, cache_control: { type: 'ephemeral' } }],
+          messages: allMessages
+        }, (delta) => writer.push(delta));
+        timer.mark('anthropic', Date.now() - anthropicT0);
+
+        const { text: reply, flagged: wkFlagged } = writer.finish();
+
+        if (!reply || !reply.trim()) throw new Error('Anthropic returned no text');
+
+        // DETECTION ONLY (decision taken 8/8/26, Jon, option b).
+        // Regenerate-on-detect is RETIRED. It corrected a completed reply before
+        // sending it; under streaming the words are already on the reader's
+        // screen by the time the pattern can be seen, so the backstop cannot
+        // keep its promise. Appending a correction afterwards was considered and
+        // rejected: a correction the reader meets AFTER the wrong figure is
+        // worse than useless in a safety-relevant answer. This stays as
+        // telemetry -- it is what would tell us a new fabrication class had
+        // appeared -- and it is logged unconditionally, surfaced via ?debug=1.
+        // Supporting evidence: fetchRawUrl was the dominant cause and there have
+        // been zero production flags since it was fixed.
+        const FETCH_FAILURE_PHRASES = /\b(failed to load|wasn'?t retrieved|not retrieved|was not retrieved|were not retrieved|404|came back empty|not delivered|wasn'?t delivered|returned an error|couldn'?t (be )?retriev)/i;
+        const suspectedFalseFetchClaim = failedLabels.length === 0 && relevantDocs.length > 0 && FETCH_FAILURE_PHRASES.test(reply);
+        if (suspectedFalseFetchClaim) {
+          console.log(`[archivist][SUSPECTED-CONFABULATION] reply used fetch-failure language but all ${relevantDocs.length} FILE_INDEX doc(s) were actually fetched successfully (fetchedLabels: ${fetchedLabels.join(', ')})`);
+        }
+
+        console.log(`[archivist] Tokens: ${result.usage?.input_tokens}in / ${result.usage?.output_tokens}out | Docs: ${relevantDocs.length}`);
+
+        // Log what was SHOWN, not what was generated -- the gate may have
+        // stripped sentences from the model's raw output.
+        try {
+          await timer.time('log', () => Promise.race([
+            logConversation(latestQuery, reply, sourceLabels, failedLabels, wkFlagged),
+            new Promise(resolve => setTimeout(resolve, 4000))
+          ]));
+        } catch (e) {
+          console.log(`[archivist] Log skipped: ${e.message}`);
+        }
+
+        const timing = timer.summary();
+        console.log(`[archivist][timing] docs=${timing.docs ?? '-'}ms tns=${timing.tns ?? '-'}ms reference=${timing.reference ?? '-'}ms scannedTns=${timing.scannedTns ?? '-'}ms wk=${timing.wk ?? '-'}ms retrievalTotal=${timing.retrievalTotal ?? '-'}ms anthropic=${timing.anthropic ?? '-'}ms log=${timing.log ?? '-'}ms total=${timing.total}ms`);
+        if (fetchDocFailures.length > 0) console.log(`[archivist][doc-fetch-failure] ${JSON.stringify(fetchDocFailures)}`);
+
+        const done = { type: 'done' };
+        if (debug) {
+          done._timing = timing;
+          done._timings = timing;
+          if (fetchDocFailures.length > 0) done._docFetchFailures = fetchDocFailures;
+          if (suspectedFalseFetchClaim) done._suspectedConfabulation = true;
+          if (writer.gated) done._wkGated = true;
+          if (wkFlagged.length > 0) done._wkFlagged = wkFlagged;
+        }
+        send(done);
+
+      } catch (err) {
+        // Headers are long gone by now, so this cannot be a 500. The client
+        // renders an error event inline; if nothing has been emitted yet it
+        // retries, and if text is already on screen it appends a note rather
+        // than restarting and duplicating the answer.
+        const timing = timer.summary();
+        console.log(`[archivist] Error: ${err.message} | [archivist][timing] total=${timing.total}ms ${JSON.stringify(timing)}`);
+        send({ type: 'error', message: err.message });
+      } finally {
+        closed = true;
+        try { controller.close(); } catch (e) {}
+      }
+    }
+  });
+
+  return new Response(stream, { status: 200, headers: SSE_HEADERS });
+}

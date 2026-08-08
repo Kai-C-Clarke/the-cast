@@ -524,6 +524,95 @@ function addMessage(role, text, sources, sourceDetails, isError) {
   return div;
 }
 
+// Streaming assistant bubble (8/8/26). addMessage() builds a finished message
+// in one go, which no longer fits: the bubble now appears on the FIRST fragment
+// and grows. Split into three so the decoration (sources panel, action buttons)
+// still happens exactly once, at the end, with the complete text — the download
+// and copy buttons close over the final string, so they must not be wired up
+// while the text is still arriving.
+function startAssistantMessage() {
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 'message-body';
+  div.appendChild(bodyEl);
+  messagesEl.appendChild(div);
+  // Show the START of Alf's answer — the reader scrolls down through it, not up
+  // to find where it began. Done once, on creation: re-scrolling on every
+  // fragment would yank the page while they were reading.
+  div.scrollIntoView({ block: 'start' });
+  messagesEl.scrollTop = Math.max(0, messagesEl.scrollTop - 8);
+  return div;
+}
+
+function updateAssistantMessage(div, text) {
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  div.querySelector('.message-body').innerHTML = esc(text).replace(/\n/g, '<br>');
+}
+
+function finishAssistantMessage(div, text, sources, sourceDetails) {
+  if (!div) return;
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  updateAssistantMessage(div, text);
+
+  if (sourceDetails && sourceDetails.length > 0) {
+    const src = document.createElement('div');
+    src.className = 'source-line';
+    src.innerHTML = '<strong>ARCHIVE SOURCES CONSULTED</strong><br>' +
+      sourceDetails.map(s => {
+        let line = `<span>› ${esc(s.label)}`;
+        if (s.url) line += ` — <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.urlName || 'authoritative copy')} ↗</a>`;
+        else line += ` <em>(held in the Archive — verify against the definitive source)</em>`;
+        return line + '</span>';
+      }).join('<br>');
+    div.appendChild(src);
+  } else if (sources && sources.length > 0) {
+    const src = document.createElement('div');
+    src.className = 'source-line';
+    src.innerHTML = '<strong>ARCHIVE SOURCES CONSULTED</strong><br>' +
+      sources.map(s => `<span>› ${esc(s)}</span>`).join('<br>');
+    div.appendChild(src);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'message-actions';
+
+  const dlBtn = document.createElement('a');
+  dlBtn.className = 'action-btn'; dlBtn.textContent = '⬇ Download'; dlBtn.href = '#';
+  dlBtn.addEventListener('click', e => {
+    e.preventDefault();
+    const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
+    const blob = new Blob([text + srcText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'alf-kirby-response.txt'; a.click();
+    URL.revokeObjectURL(url);
+  });
+  actions.appendChild(dlBtn);
+
+  const copyBtn = document.createElement('a');
+  copyBtn.className = 'action-btn'; copyBtn.textContent = '⎘ Copy'; copyBtn.href = '#';
+  copyBtn.addEventListener('click', e => {
+    e.preventDefault();
+    const srcText = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
+    navigator.clipboard.writeText(text + srcText);
+    copyBtn.textContent = '✓ Copied';
+    setTimeout(() => { copyBtn.textContent = '⎘ Copy'; }, 1600);
+  });
+  actions.appendChild(copyBtn);
+
+  const emailBtn = document.createElement('a');
+  emailBtn.className = 'action-btn'; emailBtn.textContent = '✉ Email';
+  const srcText2 = sources && sources.length ? '\n\nSources: ' + sources.join(', ') : '';
+  emailBtn.href = 'mailto:?subject=' + encodeURIComponent('From Alf Kirby — The Glider Workshop Archive') + '&body=' +
+    encodeURIComponent('From Alf Kirby — The Glider Workshop Archive:\n\n' + text + srcText2 +
+    '\n\nhttps://thecast.chat/archivist.html');
+  actions.appendChild(emailBtn);
+
+  div.appendChild(actions);
+  scrollBottom();
+}
+
 function showTyping(){
   const div = document.createElement('div');
   div.className = 'typing-dots'; div.id = 'typing';
@@ -542,43 +631,106 @@ async function sendMessage() {
   inputEl.value = ''; autoGrow();
   sendBtn.disabled = true;
   showTyping();
-  async function askOnce() {
+
+  // Streaming (8/8/26). The old shape waited for the whole answer, so long
+  // procedural replies (35-44s) blew the gateway and survived only on a blind
+  // retry. Now the server opens the stream immediately and sends events:
+  //   status  — retrieval underway (connection is live, nothing to show yet)
+  //   sources — the sources panel, which is known before Alf starts writing
+  //   text    — a fragment to append
+  //   error   — something failed after headers went out, so it can't be a 500
+  //   done    — finished cleanly
+  //
+  // IMPORTANT: what arrives here is what the reader is meant to see. The server
+  // gates the Wally Kahn material paragraph-by-paragraph BEFORE emitting it, so
+  // this end must never try to reconstruct or "fix up" the text — append only.
+  async function askStreaming(handlers) {
     const res = await fetch('/.netlify/functions/archivist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: conversationHistory })
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    if (!data.reply) throw new Error('empty reply');
-    return data;
+    if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let sawDone = false;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) !== -1) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        for (const line of frame.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const raw = line.slice(5).trim();
+          if (!raw) continue;
+          let evt;
+          try { evt = JSON.parse(raw); } catch (e) { continue; }
+          if (evt.type === 'text') handlers.onText(evt.delta);
+          else if (evt.type === 'sources') handlers.onSources(evt);
+          else if (evt.type === 'error') throw new Error(evt.message || 'stream error');
+          else if (evt.type === 'done') sawDone = true;
+        }
+      }
+    }
+    if (!sawDone) throw new Error('stream ended early');
   }
+
+  let bubble = null;
+  let acc = '';
+  let sourcesPayload = null;
+  const onText = (delta) => {
+    if (!bubble) { hideTyping(); bubble = startAssistantMessage(); }
+    acc += delta;
+    updateAssistantMessage(bubble, acc);
+  };
+  const onSources = (evt) => { sourcesPayload = evt; };
+
   try {
-    let data;
     try {
-      data = await askOnce();
+      await askStreaming({ onText, onSources });
     } catch (firstErr) {
-      // One automatic retry: warm instances have the indexes and books cached,
-      // so a second attempt usually comes back well inside the limit.
+      // Retry ONLY if nothing has been shown yet. Under the old buffered shape a
+      // blind retry was safe; now a retry after text is on screen would print the
+      // answer twice. If Alf has already started speaking, the partial answer
+      // stands and gets an honest note rather than being restarted.
+      if (acc.length > 0) throw firstErr;
       const note = document.createElement('div');
       note.className = 'typing-note';
       note.textContent = 'Taking longer than usual — having another look…';
       note.style.cssText = 'font-size:13px;color:var(--muted);padding:2px 4px 8px;';
       messagesEl.appendChild(note); scrollBottom();
       try {
-        data = await askOnce();
+        await askStreaming({ onText, onSources });
       } finally {
         note.remove();
       }
     }
     hideTyping();
-    addMessage('assistant', data.reply, data.sources, data.sourceDetails);
-    conversationHistory.push({ role: 'assistant', content: data.reply });
+    if (!acc.trim()) throw new Error('empty reply');
+    finishAssistantMessage(bubble, acc, sourcesPayload && sourcesPayload.sources, sourcesPayload && sourcesPayload.sourceDetails);
+    conversationHistory.push({ role: 'assistant', content: acc });
   } catch (err) {
     hideTyping();
-    addMessage('assistant',
-      "That one's timed out on me twice, sorry — it happens when the Archive machinery runs long, and it's nowt tha's done wrong. Give it a minute and ask again. If the question mixes the books and airworthiness together, asking them separately can help while we sort the speed out.",
-      null, null, true);
+    if (acc.trim()) {
+      // Partial answer already read: keep it, finish it off, and say plainly
+      // that it stopped short. Silently discarding text the reader has seen is
+      // worse than an incomplete answer honestly labelled.
+      finishAssistantMessage(bubble, acc, sourcesPayload && sourcesPayload.sources, sourcesPayload && sourcesPayload.sourceDetails);
+      conversationHistory.push({ role: 'assistant', content: acc });
+      const note = document.createElement('div');
+      note.className = 'typing-note';
+      note.style.cssText = 'font-size:13px;color:var(--muted);padding:2px 4px 12px;';
+      note.textContent = 'That answer stopped short of the end — the Archive machinery dropped out partway. Ask again if you need the rest of it.';
+      messagesEl.appendChild(note); scrollBottom();
+    } else {
+      addMessage('assistant',
+        "That one's timed out on me twice, sorry — it happens when the Archive machinery runs long, and it's nowt tha's done wrong. Give it a minute and ask again.",
+        null, null, true);
+    }
   } finally {
     sendBtn.disabled = false;
     inputEl.focus();
