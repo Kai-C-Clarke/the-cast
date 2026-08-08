@@ -1,0 +1,38 @@
+# Unit tests for the Alf Kirby archivist function.
+#
+# Deliberately scoped to fast, offline checks: no model calls, no credentials,
+# no traffic to the live site. That is what makes it safe to run on every push.
+# Answer quality and corpus health are covered by run_golden_set.py,
+# wk_smoke_tests.py and verify_corpus.py in the private glider-workshop repo —
+# those cost real model calls and need private-repo access, so they are run
+# deliberately rather than automatically. See tests/README.md.
+name: Alf tests
+
+on:
+  push:
+    paths:
+      - 'netlify/functions/archivist.mjs'
+      - 'archivist.html'
+      - 'tests/**'
+      - '.github/workflows/alf-tests.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the Node major Netlify runs these functions on.
+          node-version: '22'
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: npm install --no-audit --no-fund
+
+      - name: Run tests
+        working-directory: tests
+        run: node --test

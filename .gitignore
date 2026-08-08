@@ -6,3 +6,8 @@
 # must NEVER be committed to this repo, which is deliberately public.
 /netlify/functions/data/
 /wk-books/
+
+# Test dependencies (tests/package.json is nested deliberately — a root
+# package.json would change how Netlify bundles the v1 CommonJS functions
+# alongside archivist.mjs).
+/tests/node_modules/

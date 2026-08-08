@@ -1532,3 +1532,11 @@ export default async function handler(req, context) {
 
   return new Response(stream, { status: 200, headers: SSE_HEADERS });
 }
+
+// ── Test surface ──────────────────────────────────────────────────────────────
+// Named exports for the unit tests in /tests. Netlify uses ONLY the default
+// export above; these are inert in production. They exist so the tests exercise
+// the real shipped functions rather than a copy that can drift out of step with
+// them -- the whole silent-failure class this system spent 6/8 fixing came from
+// code paths nothing was checking.
+export { makeGatedWriter, makeSseParser, wkApplyChecksumGate, wkFindNearbyPageCitation };

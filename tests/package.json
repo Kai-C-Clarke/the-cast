@@ -1,0 +1,12 @@
+{
+  "name": "alf-tests",
+  "private": true,
+  "type": "module",
+  "description": "Unit tests for the Alf Kirby archivist function. Nested here rather than at the repo root deliberately: a root package.json would change how Netlify bundles the four v1 CommonJS functions in netlify/functions.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0"
+  }
+}
