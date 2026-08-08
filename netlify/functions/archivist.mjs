@@ -34,9 +34,13 @@ const GITHUB_REPO = 'Kai-C-Clarke/vintage-glider-knowledge-base';
 // change only takes effect on Alf after the next deploy (any push to
 // the-cast, or a manual "Trigger deploy" in Netlify if only the data changed).
 // ESM (8/8/26): this file is .mjs so Netlify treats it as a v2 streaming
-// function; __dirname does not exist in ESM.
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, 'data');
+// function, and __dirname does not exist in ESM. Do NOT reintroduce a
+// `const __dirname` here: Netlify's esbuild bundler injects its own __dirname
+// shim for ESM functions, and declaring one collides at BUNDLE time with
+// "Identifier '__dirname' has already been declared". node --check cannot see
+// that, because the source itself is valid -- caught only on deploy, 8/8/26.
+const FUNCTION_DIR = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = path.join(FUNCTION_DIR, 'data');
 function readBundled(filename) {
   try {
     return fs.readFileSync(path.join(DATA_DIR, filename), 'utf8');
