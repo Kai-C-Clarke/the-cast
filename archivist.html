@@ -157,14 +157,24 @@ button { font-family: var(--font-body); cursor: pointer; }
 }
 .chip:hover { border-color: var(--green); background: var(--green-wash); }
 
-/* Disclaimer + input */
-#disclaimer {
-  margin: 0 28px; padding: 8px 12px;
-  border: 1px solid var(--line); border-radius: 6px;
-  background: var(--panel);
-  font-size: 12.5px; color: var(--muted); line-height: 1.45;
+/* ---------- Warning band ----------
+   Sits directly under the top bar so it is read before anything is typed
+   and stays on screen while an answer streams. Raised to this position
+   11/8/26 at Pete Stratten's request; the quieter block that used to sit
+   above the input bar was removed at the same time rather than say the
+   same thing twice. */
+#warning-band {
+  flex-shrink: 0;
+  background: #FBF0DC;
+  border-bottom: 1px solid #C8922E;
+  padding: 9px 20px;
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 13.5px; line-height: 1.45; color: #633806;
 }
-#disclaimer strong { color: var(--ink); }
+#warning-band svg { flex-shrink: 0; margin-top: 2px; }
+#warning-band strong { color: #412402; font-weight: 600; }
+
+/* Input */
 #input-bar { display: flex; gap: 10px; padding: 12px 28px 20px; }
 #user-input {
   flex: 1; resize: none; border: 1px solid var(--line); border-radius: var(--radius);
@@ -241,12 +251,12 @@ footer {
   background: #0A1450;              /* BGA navy — the acknowledgement carries the nod */
   border-top: 4px solid #5B9BD5;    /* BGA light-blue rule */
   padding: 9px 16px;
-  font-size: 12px; color: #B8C6E8;
+  font-size: 13.5px; color: #C3CFEC;
   text-align: center; line-height: 1.5;
 }
 footer strong { color: #FFFFFF; font-weight: 600; }
 footer a { color: #9FC1E8; }
-footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; white-space: nowrap; color: #8EA3D0; }
+footer .cast { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; white-space: nowrap; color: #8EA3D0; }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 900px) {
@@ -258,7 +268,7 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
   #hero { padding: 14px 16px 12px; }
   #chat-col { border-right: none; }
   #messages, #chips, #input-bar { padding-left: 16px; padding-right: 16px; }
-  #disclaimer { margin: 0 16px; }
+  #warning-band { padding: 8px 16px; font-size: 13px; }
   .message { max-width: 100%; }
 }
 #archive-close { display: block; margin-bottom: 10px; background: none; border: none; color: var(--green); font-size: 15px; font-weight: 600; }
@@ -279,6 +289,11 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
   <button id="new-chat-btn">New chat</button>
 </header>
 
+<div id="warning-band" role="note">
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#854F0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <div><strong>Alf can be wrong.</strong> Research assistance only &mdash; you or your inspector must verify every procedure, specification and requirement against current authoritative sources. Nothing here is approved maintenance data.</div>
+</div>
+
 <section id="hero">
   <span class="avatar-ring"><img src="alf.jpg?v=2" alt="Portrait of Alf Kirby"></span>
   <h1>&ldquo;If it&rsquo;s in t&rsquo;archive I&rsquo;ll find it. If it isn&rsquo;t, I&rsquo;ll tell you straight.&rdquo;</h1>
@@ -295,12 +310,6 @@ footer .cast { font-family: var(--font-mono); font-size: 10.5px; letter-spacing:
       <button class="chip">How do I safety-wire a turnbuckle?</button>
       <button class="chip">Is Aerodux still available — what should I use now?</button>
       <button class="chip">How often does a glider need reweighing?</button>
-    </div>
-
-    <div id="disclaimer">
-      <strong>Alf provides research assistance only.</strong>
-      You or your inspector must verify every procedure, specification and requirement against
-      current authoritative sources. Nothing here constitutes approved maintenance data.
     </div>
 
     <div id="input-bar">
